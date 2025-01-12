@@ -2,6 +2,7 @@ from tkinter import *
 import receive
 import parse
 from threading import Thread
+import tools
 #############
 import threading
 
@@ -61,6 +62,9 @@ parse_input2.pack()
 
 parse_button = Button(window, text="Parse", command=run_parse)
 parse_button.pack()
+
+parse_csv_button = Button(window, text="Parse CSV", command=lambda: tools.parse_csv())
+parse_csv_button.pack()
 
 #########################
 
