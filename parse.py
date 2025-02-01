@@ -1,22 +1,11 @@
-import xsensdeviceapi as xda
+from ins_tools.util import *
+import ins_tools.visualize as visualize
+from ins_tools.INS import INS
 import time
-from threading import Lock
+import os
+import sys
 
-# Callback class to handle device progress updates
-class XdaCallback(xda.XsCallback):
-    def __init__(self):
-        xda.XsCallback.__init__(self)
-        self.m_progress = 0 
-        self.m_lock = Lock() # Thread lock
-
-    def progress(self):
-        return self.m_progress
-
-    def onProgressUpdated(self, dev, current, total, identifier):
-        # Update progress value in a thread-safe way
-        self.m_lock.acquire()
-        self.m_progress = current
-        self.m_lock.release()
+from decimal import Decimal
 
 class Parse:
     def __init__(self):
@@ -28,119 +17,54 @@ class Parse:
     def toggleRunning(self):
         self.running = not self.running
 
-    def main(self, mtb, csv):
+    def plot_data(self, trial_type, trial_speed, file_name):
         self.toggleRunning()
-        # Default values
-        if not mtb:
-            mtb = "logfile"
-        if not csv:
-            csv = "exportfileTEMP"
+        if not trial_type:
+            trial_type = "hallway"
+        if not trial_speed:
+            trial_speed = "walk"
+        if not file_name:
+            file_name = "exportfile"
+        
+        start_time = time.time()
 
-        print("Creating XsControl object...")
-        # Create an instance of XsControl
-        control = xda.XsControl_construct()
-        assert(control != 0)
+        det = 'shoe'
+        thresh = 8.5e7 #zero-velocity threshold
+        win = 5   #window size
+        legend = ['SHOE'] #used for plotting results
 
-        # Get and display the Xsens Device API version
-        xdaVersion = xda.XsVersion()
-        xda.xdaVersion(xdaVersion)
-        print("Using XDA version %s" % xdaVersion.toXsString())
+        try:
+            with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'), mode="r") as file:
+                reader = csv.reader(file)
+                next(reader)
+                imu = np.array([list(map(float, row)) for row in reader], dtype=float) 
 
-        #try:
-        logfileName = mtb+".mtb"
-        print("Opening log file %s..." % logfileName)
-        # Attempt to open the log file
-        if not control.openLogFile(logfileName):
+            print ('1. Initialise INS object (would have entire data already)')
+            ins = INS(imu, sigma_a = 0.00098, sigma_w = 8.7266463e-5, T=1.0/100) #microstrain
+
+            ###Estimate trajectory for shoe zv detector
+            zv = ins.Localizer.compute_zv_lrt(W=win, G=thresh, detector=det)
+            #print (zv.tolist())
+
+            print ('10. baseline using zupt')
+            x = ins.baseline(zv=zv)
+
+            if trial_speed == 'comb':
+                trial = 'Mixed-Motion Trial'
+            if trial_speed == 'run':
+                trial = 'Running Trial'
+            if trial_speed == 'walk':
+                trial = 'Walking Trial'
+
+            print ('15. Plot')
+            visualize.plot_topdown(x, title='{} (Top-Down View)'.format(trial), save_dir='results/%s_%s_%s_%s.png' % ('hallway', trial_speed, file_name, '%.2E' % Decimal(thresh)), legend=legend, zv=zv)
+            print("My program took", time.time() - start_time, "to run")
             self.toggleRunning()
-            raise RuntimeError("Failed to open log file. Aborting.")
-        print("Opened log file: %s" % logfileName)
-
-        # Retrieve device IDs from the log file ############
-        deviceIdArray = control.mainDeviceIds()
-        for i in range(deviceIdArray.size()):
-            if deviceIdArray[i].isMti() or deviceIdArray[i].isMtig():
-                mtDevice = deviceIdArray[i]
-                break
-
-        # Check if an MTi device was found
-        if not mtDevice:
+        except FileNotFoundError:
             self.toggleRunning()
-            raise RuntimeError("No MTi device found. Aborting.")
-
-        # Get the device object
-        device = control.device(mtDevice)
-        assert(device != 0)
-
-        print("Device: %s, with ID: %s found in file" % (device.productCode(), device.deviceId().toXsString()))
-
-        # Create and attach callback handler to device
-        callback = XdaCallback()
-        device.addCallbackHandler(callback)
-
-        # By default XDA does not retain data for reading it back.
-        # By enabling this option XDA keeps the buffered data in a cache so it can be accessed 
-        # through XsDevice::getDataPacketByIndex or XsDevice::takeFirstDataPacketInQueue
-        device.setOptions(xda.XSO_RetainBufferedData, xda.XSO_None);
-
-        # Load the log file and wait until it is loaded
-        # Wait for logfile to be fully loaded, there are three ways to do this:
-        # - callback: Demonstrated here, which has loading progress information
-        # - waitForLoadLogFileDone: Blocking function, returning when file is loaded
-        # - isLoadLogFileInProgress: Query function, used to query the device if the loading is done
-        #
-        # The callback option is used here.
-
-        print("Loading the file...")
-        # Load the log file
-        device.loadLogFile()
-        while callback.progress() != 100:
-            time.sleep(0)
-        print("File is fully loaded")
-
-        # Get total number of samples
-        packetCount = device.getDataPacketCount()
-
-        # Export the data
-        print("Exporting the data...")
-        s = "count,timestamp,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,q0,q1,q2,q3\n"
-        index = 0
-        while index < packetCount:
-            # Retrieve a packet
-            packet = device.getDataPacketByIndex(index)
-            count = packet.packetCounter()
-            s += "%s" % (count)
-            timestamp = packet.timeOfArrival()
-            s += ",%s" % (timestamp.msTime())
-            acc = packet.calibratedAcceleration()
-            s += ",%s,%s,%s" % (acc[0],acc[1],acc[2])
-            gyr = packet.calibratedGyroscopeData()
-            s += ",%s,%s,%s" % (gyr[0],gyr[1],gyr[2])
-            quaternion = packet.orientationQuaternion()
-            s += ",%s,%s,%s,%s" % (quaternion[0],quaternion[1],quaternion[2],quaternion[3])
-
-            s += "\n" # Add a newline for each packet
-            index += 1
-
-        # Save the exported data to a file
-        exportFileName = csv+".csv"
-        with open(exportFileName, "w") as outfile:
-            outfile.write(s)
-        print("File is exported to: %s" % exportFileName)
-
-        print("Removing callback handler...")
-        device.removeCallbackHandler(callback)
-
-        print("Closing XsControl object...")
-        control.close()
-        self.toggleRunning()
-        ''''
-        except RuntimeError as error:
+            print(f"Error: File '{os.path.join('data',trial_type,trial_speed,file_name+'.csv')}' not found.")
+            sys.exit(1)
+        except Exception as e:
             self.toggleRunning()
-            print(error)
-        except:
-            self.toggleRunning()
-            print("An unknown fatal error has occured. Aborting.")
-        else:
-            self.toggleRunning()
-            print("Successful exit.")
-        '''
+            print(f"Unexpected error: {e}")
+            sys.exit(1)

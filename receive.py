@@ -1,7 +1,13 @@
 import sys
+import numpy as np
 import xsensdeviceapi as xda
 from threading import Lock
-import csv
+import os
+import tools
+from ins_tools.util import *
+import ins_tools.visualize as visualize
+from ins_tools.INS import INS
+
 
 # Callback class to handle live data from the device
 class XdaCallback(xda.XsCallback):
@@ -9,8 +15,10 @@ class XdaCallback(xda.XsCallback):
         xda.XsCallback.__init__(self)
         self.m_maxNumberOfPacketsInBuffer = max_buffer_size # Max buffer size for storing packets
         self.m_packetBuffer = list() # Buffer to store data packets
-        self.data_list = [] 
         self.m_lock = Lock() # Thread lock
+        self.data_list = [] 
+        self.zv = False
+        self.log_zv = [0]
 
     def packetAvailable(self):
         # Check if there are packets available in the buffer
@@ -31,27 +39,26 @@ class XdaCallback(xda.XsCallback):
         # Handle live data packets as they become available
         self.m_lock.acquire()
         assert(packet != 0) # Ensure the packet is valid
-        count = packet.packetCounter()
-        timestamp = packet.timeOfArrival()
+        count = packet.packetCounter() ####
         acc = packet.calibratedAcceleration()
         gyr = packet.calibratedGyroscopeData()
-        quaternion = packet.orientationQuaternion()
+
         data = {
-                "count": count,
-                "timestamp": timestamp.msTime(),
                 "AccX": acc[0],
                 "AccY": acc[1],
                 "AccZ": acc[2],
                 "GyrX": gyr[0],
                 "GyrY": gyr[1],
                 "GyrZ": gyr[2],
-                "q0": quaternion[0],
-                "q1": quaternion[1],
-                "q2": quaternion[2],
-                "q3": quaternion[3]
             }
+        
         self.data_list.append(data) 
         #print(data)
+
+        if self.zv: ####
+            self.log_zv.append(count) ####
+            self.zv = not self.zv ####
+
         while len(self.m_packetBuffer) >= self.m_maxNumberOfPacketsInBuffer:
             self.m_packetBuffer.pop() # Remove the oldest packet if buffer is full
         self.m_packetBuffer.append(xda.XsDataPacket(packet)) # Add the new packet to the buffer
@@ -59,11 +66,17 @@ class XdaCallback(xda.XsCallback):
 
     def getLengthData(self):
         return len(self.data_list)
+    
+    def toggleZV(self):
+        self.m_lock.acquire()
+        self.zv = not self.zv
+        self.m_lock.release()
 
 class Receive:
     def __init__(self):
         self.stop = False
         self.running = False
+        self.callback = None #### DELETE IF REMOVE MANUALLY LOG STATIONARY PHASE
 
     def getStop(self):
         return self.stop
@@ -76,47 +89,53 @@ class Receive:
 
     def toggleRunning(self):
         self.running = not self.running
+    
+    def toggleZV(self): ####
+        self.callback.toggleZV() ####
 
-    def main(self, mtbName, csvName):
+    def main(self, trial_type, trial_speed, file_name):
         self.toggleRunning()
+        self.callback = XdaCallback() #### RESETS OR INITS THE OBJECT
         # Default values
-        if not mtbName:
-            mtbName = "logfile"
-        if not csvName:
-            csvName = "exportfile"
+        if not trial_type:
+            trial_type = "hallway"
+        if not trial_speed:
+            trial_speed = "walk"
+        if not file_name:
+            file_name = "exportfile"
 
         # Create XsControl object
         control = xda.XsControl_construct()
         assert(control != 0)
 
         ####################
-        xdaVersion = xda.XsVersion()
-        xda.xdaVersion(xdaVersion)
-        print("Using XDA version %s" % xdaVersion.toXsString())
+        xda_version = xda.XsVersion()
+        xda.xdaVersion(xda_version)
+        print("Using XDA version %s" % xda_version.toXsString())
         ####################
 
         try:
             # Scan for connected Xsens devices
-            portInfoArray =  xda.XsScanner_scanPorts() 
+            port_info_array =  xda.XsScanner_scanPorts() 
             # Find an MTi device
-            mtPort = xda.XsPortInfo()
-            for i in range(portInfoArray.size()):
-                if portInfoArray[i].deviceId().isMti() or portInfoArray[i].deviceId().isMtig():
-                    mtPort = portInfoArray[i]
+            mt_port = xda.XsPortInfo()
+            for i in range(port_info_array.size()):
+                if port_info_array[i].deviceId().isMti() or port_info_array[i].deviceId().isMtig():
+                    mt_port = port_info_array[i]
                     break
-            if mtPort.empty():
+            if mt_port.empty():
                 self.toggleRunning()
                 raise RuntimeError("No MTi device found. Aborting.")
 
             ####################
             # Display device details
-            did = mtPort.deviceId()
+            did = mt_port.deviceId()
             print(" Device ID: %s" % did.toXsString())
-            print(" Port name: %s" % mtPort.portName())
+            print(" Port name: %s" % mt_port.portName())
             ####################
 
             # Open the communication port for the device
-            if not control.openPort(mtPort.portName(), mtPort.baudrate()):
+            if not control.openPort(mt_port.portName(), mt_port.baudrate()):
                 self.toggleRunning()
                 raise RuntimeError("Could not open port. Aborting.")
 
@@ -128,8 +147,8 @@ class Receive:
             ####################
 
             # Create and attach callback handler to device
-            callback = XdaCallback()
-            device.addCallbackHandler(callback)
+            # callback = XdaCallback() #### UNCOMMENT AND REPLACE ALL SELF.CALLBACK 
+            device.addCallbackHandler(self.callback)
 
             # Put the device into configuration mode before configuring the device
             if not device.gotoConfig():
@@ -137,23 +156,17 @@ class Receive:
                 raise RuntimeError("Could not put device into configuration mode. Aborting.")
 
             # Set up the output configuration
-            configArray = xda.XsOutputConfigurationArray()
-            configArray.push_back(xda.XsOutputConfiguration(xda.XDI_PacketCounter, 0))
-            configArray.push_back(xda.XsOutputConfiguration(xda.XDI_SampleTimeFine, 0))
+            config_array = xda.XsOutputConfigurationArray()
+            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_PacketCounter, 0))
+            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_SampleTimeFine, 0))
             # Add IMU configurations
-            configArray.push_back(xda.XsOutputConfiguration(xda.XDI_Acceleration, 100))
-            configArray.push_back(xda.XsOutputConfiguration(xda.XDI_RateOfTurn, 100))
+            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_Acceleration, 100))
+            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_RateOfTurn, 100))
 
             # Apply the output configuration
-            if not device.setOutputConfiguration(configArray):
+            if not device.setOutputConfiguration(config_array):
                 self.toggleRunning()
                 raise RuntimeError("Could not configure the device. Aborting.")
-
-            # Create a log file to store recorded data
-            logFileName = mtbName+".mtb"
-            if device.createLogFile(logFileName) != xda.XRV_OK:
-                self.toggleRunning()
-                raise RuntimeError("Failed to create a log file. Aborting.")
 
             # Put the device into measurement mode
             if not device.gotoMeasurement():
@@ -165,12 +178,12 @@ class Receive:
                 self.toggleRunning()
                 raise RuntimeError("Failed to start recording. Aborting.")
             ####################
-            startTime = xda.XsTimeStamp_nowMs()
+            start_time = xda.XsTimeStamp_nowMs()
             ####################
 
             # Main loop to control how long the device is being recorded
             while not self.stop:
-                print ("Still running...")
+                #print ("Still running...")
                 pass  
             
             '''
@@ -188,30 +201,29 @@ class Receive:
                 self.toggleRunning()
                 raise RuntimeError("Failed to close log file. Aborting.")
             # Remove callback handler
-            device.removeCallbackHandler(callback)
+            device.removeCallbackHandler(self.callback)
             # Close the port
-            control.closePort(mtPort.portName())
+            control.closePort(mt_port.portName())
             # Close XsControl object
             control.close()
 
             ####################
-            runtime = (xda.XsTimeStamp_nowMs() - startTime) / 1000
-            length = callback.getLengthData()
+            runtime = (xda.XsTimeStamp_nowMs() - start_time) / 1000
+            length = self.callback.getLengthData()
             print ("Time: %s seconds" % runtime)
             print ("Datapoints: ", length)
             print ("Frequency: ", round(length / runtime, 2))
             ####################
 
-            #######################
-            csvFileName = csvName+".csv"
-            keys = callback.data_list[0].keys()
-            with open(csvFileName, "w") as outfile:
-                dict_writer = csv.DictWriter(outfile, keys)
-                dict_writer.writeheader()
-                dict_writer.writerows(callback.data_list)
-            print("CSV file created: %s" % csvFileName)
-            print("Log file created: %s" % logFileName)
-            #######################
+            tools.export_csv(os.path.join('data',trial_type,trial_speed,file_name), self.callback.data_list)
+            print("CSV file created: "+file_name+'.csv')
+
+            with open('test_zv.csv',"w", newline="") as file: ####
+                writer = csv.writer(file) ####
+                writer.writerow(["count"])  ####
+                for value in self.callback.log_zv: ####
+                    writer.writerow([value]) ####
+            print("CSV file created: test_zv.csv") ####
 
             self.toggleRunning()
             self.toggleStop()
@@ -219,7 +231,7 @@ class Receive:
             self.toggleRunning()
             print(error)
             sys.exit(1)
-        except:
-            print("An unknown fatal error has occured. Aborting.")
+        except Exception as e:
             self.toggleRunning()
+            print(f"Unexpected error: {e}")
             sys.exit(1)

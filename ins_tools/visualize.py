@@ -1,40 +1,32 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 
-###Plot 2d (xy) trajectories (traj is a list of trajectories, with gt being the final one) 
-def plot_topdown_gt(traj, trigger_ind=None, gt_method = 'dense', title=None, save_dir=None, legend=[], Loc=4, markerind =[]):
-    #gt_method is dense for Vicon, and sparse for hallway + stairs
-    plt.figure()
-    plt.clf()
-    colour = ['blue', 'green', 'darkorange', 'gold']
-    for i in range(len(traj)-1):
-        if trigger_ind is not None:
-            plt.plot(-traj[i][:,0], traj[i][:,1], '-gD', markevery=trigger_ind, linewidth = 1.7, color=colour[i], markersize=5, markeredgewidth=0.005, markeredgecolor='black')
-        else:
-            plt.plot(-traj[i][:,0], traj[i][:,1], linewidth = 1.7, color=colour[i])
-    if gt_method == 'sparse':
-        plt.scatter(-traj[-1][:,0], traj[-1][:,1], s=13, color='red',zorder=len(traj)+1)
-    elif gt_method == 'none':
-        gt=None
-    else:
-        print (5)
-        plt.plot(-traj[-1][:,0], traj[-1][:,1], color='red')
-    if title != None:
-        plt.title(title, fontsize=20, color='black')
-    plt.ylabel('y (m)', fontsize=22)
-    plt.xlabel('x (m)', fontsize=22)
-    plt.tick_params(labelsize=22)
-    plt.subplots_adjust(top=0.8)
-    plt.legend(legend, fontsize=15, numpoints=1)
-    plt.grid()
-    if save_dir:
-        plt.savefig(save_dir, dpi=400, bbox_inches='tight')
+def plot_topdown(traj, title=None, save_dir=None, legend=[], Loc=4, markerind =[], zv=[], approx=True, estim=True):
+    with open('test_zv.csv', mode="r") as f:
+        reader = csv.reader(f)
+        next(reader)
+        data = [int(row) for row in f] 
 
-def plot_topdown(traj, title=None, save_dir=None, legend=[], Loc=4, markerind =[]):
-    #gt_method is dense for Vicon, and sparse for hallway + stairs
+    # Limit the data to the first 3000 points
+    #traj = traj[:3000]
+    #zv = zv[:3000]
+
     plt.figure()
     plt.clf()
     plt.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue')
+    if estim:
+        if len(zv) != 0:
+            traj_true = traj[zv]  # Select points where zv is True
+            plt.scatter(-traj_true[:, 0], traj_true[:, 1], color='red', s=30)
+            legend.append('Estimated ZV')
+
+    if approx: ####
+        if len(data) > 0: ####
+            traj_data = traj[data]  # Select points using indexes from CSV ####
+            plt.scatter(-traj_data[:, 0], traj_data[:, 1], facecolors='none', color='green', s=30) ####
+            legend.append('Approx actual ZV') ####
+
     if title != None:
         plt.title(title, fontsize=20, color='black')
     plt.ylabel('y (m)', fontsize=22)
