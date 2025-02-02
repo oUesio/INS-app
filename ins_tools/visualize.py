@@ -2,11 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 
-def plot_topdown(traj, title=None, save_dir=None, legend=[], Loc=4, markerind =[], zv=[], approx=True, estim=True):
-    with open('test_zv.csv', mode="r") as f:
-        reader = csv.reader(f)
-        next(reader)
-        data = [int(row) for row in f] 
+def plot_topdown(traj, title=None, save_dir=None, Loc=4, markerind =[], zv=[], approx=True, estim=True):
+    with open('test_zv.csv', mode="r") as f: ####
+        reader = csv.reader(f) ####
+        next(reader) ####
+        data = [int(row) for row in f]  ####
 
     # Limit the data to the first 3000 points
     #traj = traj[:3000]
@@ -15,6 +15,8 @@ def plot_topdown(traj, title=None, save_dir=None, legend=[], Loc=4, markerind =[
     plt.figure()
     plt.clf()
     plt.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue')
+
+    legend = ['SHOE'] ####
     if estim:
         if len(zv) != 0:
             traj_true = traj[zv]  # Select points where zv is True
@@ -29,65 +31,31 @@ def plot_topdown(traj, title=None, save_dir=None, legend=[], Loc=4, markerind =[
 
     if title != None:
         plt.title(title, fontsize=20, color='black')
-    plt.ylabel('y (m)', fontsize=22)
     plt.xlabel('x (m)', fontsize=22)
+    plt.ylabel('y (m)', fontsize=22)
     plt.tick_params(labelsize=22)
     plt.subplots_adjust(top=0.8)
     plt.legend(legend, fontsize=15, numpoints=1)
+    # plt.legend(['SHOE'], fontsize=15, numpoints=1) ####
     plt.grid()
     if save_dir:
         plt.savefig(save_dir, dpi=400, bbox_inches='tight')
 
-###Plot the vertical estimate wrt time.  (traj is a list of trajectories, no ground truth is required)
-def plot_vertical(ts, traj, trigger_ind=None, title=None, save_dir=None, legend=[], Loc=4, markerind =[]):
+###Plot the vertical estimate
+def plot_vertical(traj, T=1.0/100, title=None, save_dir=None, Loc=4, markerind =[]):
     plt.figure()
     plt.clf()
-#    plt.rc('text', usetex=True)
-#    plt.rc('font', family='serif')
-#    plt.rcParams["font.family"] = "Times New Roman"
-    colour = ['blue', 'green', 'darkorange', 'gold']
-    for i in range(len(traj)-1):
-        if trigger_ind is not None:
-            plt.plot(ts, traj[i][:,2], '-gD', markevery=trigger_ind, linewidth = 1, color=colour[i], markersize=5, markeredgewidth=0.005, markeredgecolor='black')
-        else:
-            plt.plot(ts, traj[i][:,2], linewidth = 1, color=colour[i])
-    if title != None:
-        plt.title(title, fontsize=20, color='black')
+    num_points = traj.shape[0]
+    time_values = np.arange(0, num_points * T, T) 
+    plt.plot(time_values, traj[:,2], linewidth = 1, color='blue')
+    plt.title(title, fontsize=20, color='black')
+    plt.xlabel('Time (s)', fontsize=22)
     plt.ylabel('z (m)', fontsize=22)
-    plt.xlabel('Time (s)', fontsize=22)
-    plt.xlim([ts[trigger_ind[0]]-1, ts[trigger_ind[-1]]+1])
     plt.tick_params(labelsize=22)
-    plt.subplots_adjust(top=0.8)
-    plt.legend(legend, fontsize=15, numpoints=1)
+    plt.legend(['SHOE'], fontsize=15, numpoints=1)
     plt.grid()
     if save_dir:
-        plt.savefig(save_dir, dpi=400, bbox_inches='tight')        
-
-###plot stair trajectories, along with the floor levels       
-def plot_stairs(ts, traj, gt, title=None, legend=None, trigger_ind=None, save_dir=None):       
-    plt.figure()
-    plt.clf()
-#    plt.rc('text', usetex=True)
-#    plt.rc('font', family='serif')
-#    plt.rcParams["font.family"] = "Times New Roman"
-    colour = ['blue', 'green', 'darkorange', 'gold']
-    for i in range(0, len(traj)):
-        if trigger_ind is not None:
-            plt.plot(ts, traj[i][:,2], '-gD', markevery=trigger_ind, linewidth = 1.7, color=colour[i], markersize=5, markeredgewidth=0.005, markeredgecolor='black')
-        else:
-            plt.plot(ts, traj[i][:,2])
-    for i in range(0, int((gt.shape[0]-1)/2 +1)):    
-        plt.plot(ts, gt[i]*np.ones(len(ts)), '--', linewidth=1.25, color='red')
-    if title != None:
-        plt.title(title, fontsize=20, color='black')
-    plt.xlabel('Time (s)', fontsize=22)
-    plt.ylabel('Vertical Height (m)', fontsize=22)  
-    plt.tick_params(labelsize=22)
-    plt.grid()
-    if legend is not None:
-        plt.legend(legend, fontsize=15, numpoints=1)
-    if save_dir:
-        plt.savefig(save_dir, dpi=400, bbox_inches='tight')
+        plt.savefig(save_dir, dpi=400, bbox_inches='tight')       
 
 ###plot IMU linear acceleration
 def plot_acc(imudata, save_dir):
