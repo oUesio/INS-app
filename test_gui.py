@@ -9,13 +9,17 @@ rec = Receive()
 par = Parse()
 
 def start_receive():
-    # Only runs if receive is not running
     if not rec.getRunning() and not par.getRunning():
-        Thread(target=rec.main, args=(receive_input1.get(),receive_input2.get(),receive_input3.get(),)).start()
+        input1 = receive_input1.get()
+        input2 = receive_input2.get()
+        input3 = receive_input3.get()
+        Thread(target=rec.main, args=(input1, input2, input3), daemon=True).start()
+
 
 def stop_receive():
     # Only runs if receive is running
     if rec.getRunning():
+        print (str(rec.getRunning()))
         rec.toggleStop()
         print ("\nStopped running")
 
@@ -26,7 +30,10 @@ def log_zv():
 
 def run_parse():
     if not rec.getRunning() and not par.getRunning():
-        Thread(target=par.plot_data, args=(parse_input1.get(),parse_input2.get(),parse_input3.get(),)).start()
+        input1 = receive_input1.get()
+        input2 = receive_input2.get()
+        input3 = receive_input3.get()
+        Thread(target=par.plot_data, args=(input1, input2, input3), daemon=True).start()
 
 # Create the main window
 window = Tk()

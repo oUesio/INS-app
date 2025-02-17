@@ -5,6 +5,9 @@ from ins_tools.geometry_helpers import quat2mat, mat2quat, euler2quat, quat2eule
 import sys
 sys.path.append('../')
 
+
+import matplotlib.pyplot as plt #################
+
 class Localizer():
     def __init__(self, config, imudata):
         # config: A dictionary of configuration parameters
@@ -123,8 +126,6 @@ class Localizer():
         gyro = imudata[:,3:6]
     
         i=0
-        print ('6. Loop through IMU data in windows of size W')
-        print ('7. Windows: %s - %s (%s)' % (0, imudata.shape[0]-W+1, W))
         for k in range(0,imudata.shape[0]-W+1,W): #filter through all imu readings
             # Compute mean acceleration for window
             smean_a = np.mean(acc[k:k+W,:],axis=0)
@@ -141,17 +142,26 @@ class Localizer():
             i+=1
         zupt = zupt/W
         # Zero-velocity likelihood
-        print ('8. Output zupt likelihood')
         return zupt
         
-
     ### if a custom zero-velocity detector was added as a function above, additionally modify this list:    
     def compute_zv_lrt(self, W=5, G=3e8, detector='shoe', return_zv=True): #import window size, zv-threshold
         # Compares likelihoods  against a threshold to determine whether zero velocity is detected
-        print ('5. Choose shoe detector (compute_zv_lrt)')
         if detector=='shoe':    
             zv = self.SHOE(W=W)
-        print ('9. More stuff for zupt')
+        #################
+        '''        #data = np.array(zv[1500:3750])
+        plt.figure(figsize=(13, 5))
+        plt.plot(range(len(zv)), zv, linestyle='-', color='b')
+        plt.axhline(y=G, color='r', linestyle='--')
+
+        # Labels and title
+        plt.xlabel('Index')
+        plt.ylabel('ZV')
+        plt.title('ZV before threshold')
+        plt.grid(True)    
+        plt.savefig("test_zv/plot_test_1.5e8.png")  
+        #################'''
         if return_zv:
             zv=zv<G
         return zv

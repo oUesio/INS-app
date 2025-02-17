@@ -8,7 +8,6 @@ from ins_tools.util import *
 import ins_tools.visualize as visualize
 from ins_tools.INS import INS
 
-
 # Callback class to handle live data from the device
 class XdaCallback(xda.XsCallback):
     def __init__(self, max_buffer_size = 5):
@@ -117,6 +116,7 @@ class Receive:
         try:
             # Scan for connected Xsens devices
             port_info_array =  xda.XsScanner_scanPorts() 
+            print (port_info_array)
             # Find an MTi device
             mt_port = xda.XsPortInfo()
             for i in range(port_info_array.size()):
@@ -124,7 +124,6 @@ class Receive:
                     mt_port = port_info_array[i]
                     break
             if mt_port.empty():
-                self.toggleRunning()
                 raise RuntimeError("No MTi device found. Aborting.")
 
             ####################
@@ -135,8 +134,17 @@ class Receive:
             ####################
 
             # Open the communication port for the device
+            print (mt_port.portName())
+            print (mt_port.baudrate()) # 115200 bps
+            temp = [xda.XBR_230k4, xda.XBR_460k8, xda.XBR_921k6 , xda.XBR_2000k , xda.XBR_3500k , xda.XBR_4000k]
+            '''
+            for x in temp:
+                print (x)
+                print (str(x) + ': ' + str(control.openPort(mt_port.portName(), x)))
+                '''
+
+            #return
             if not control.openPort(mt_port.portName(), mt_port.baudrate()):
-                self.toggleRunning()
                 raise RuntimeError("Could not open port. Aborting.")
 
             ####################
@@ -152,7 +160,6 @@ class Receive:
 
             # Put the device into configuration mode before configuring the device
             if not device.gotoConfig():
-                self.toggleRunning()
                 raise RuntimeError("Could not put device into configuration mode. Aborting.")
 
             # Set up the output configuration
@@ -160,22 +167,19 @@ class Receive:
             config_array.push_back(xda.XsOutputConfiguration(xda.XDI_PacketCounter, 0))
             config_array.push_back(xda.XsOutputConfiguration(xda.XDI_SampleTimeFine, 0))
             # Add IMU configurations
-            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_Acceleration, 100))
-            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_RateOfTurn, 100))
+            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_Acceleration, 200))
+            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_RateOfTurn, 200))
 
             # Apply the output configuration
             if not device.setOutputConfiguration(config_array):
-                self.toggleRunning()
                 raise RuntimeError("Could not configure the device. Aborting.")
 
             # Put the device into measurement mode
             if not device.gotoMeasurement():
-                self.toggleRunning()
                 raise RuntimeError("Could not put device into measurement mode. Aborting.")
 
             # Start recording data
             if not device.startRecording(): 
-                self.toggleRunning()
                 raise RuntimeError("Failed to start recording. Aborting.")
             ####################
             start_time = xda.XsTimeStamp_nowMs()
@@ -198,7 +202,6 @@ class Receive:
 
             # Close the log file
             if not device.closeLogFile():
-                self.toggleRunning()
                 raise RuntimeError("Failed to close log file. Aborting.")
             # Remove callback handler
             device.removeCallbackHandler(self.callback)
@@ -225,13 +228,13 @@ class Receive:
                     writer.writerow([value]) ####
             print("CSV file created: test_zv.csv") ####
 
-            self.toggleRunning()
-            self.toggleStop()
+            self.toggleStop() # Toggle again since toggle was pressed
         except RuntimeError as error:
-            self.toggleRunning()
             print(error)
             sys.exit(1)
         except Exception as e:
-            self.toggleRunning()
             print(f"Unexpected error: {e}")
             sys.exit(1)
+        finally:
+            self.toggleRunning()  # Ensure running is set to False when the thread ends
+            print("Receive thread has ended.")
