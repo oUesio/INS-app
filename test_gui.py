@@ -2,97 +2,139 @@ from tkinter import *
 from receive import Receive
 from parse import Parse
 from threading import Thread
+import numpy as np
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 #############
 import threading
 
-rec = Receive()
-par = Parse()
+class INS_App():
+    def __init__(self):
+        self.rec = Receive()
+        self.par = Parse()
+        self.imudata = np.zeros((250, 6))  # Initialize with empty data
+        
+        self.window = Tk()
+        self.window.geometry('1000x900')
+        self.window.title("INS App")
+        
+        canvas = FigureCanvasTkAgg(plt.gcf(), master=self.window)
+        canvas.get_tk_widget().grid(row=14, column=0)
+        # Create two subplots in row 1 and column 1, 2
+        plt.gcf().subplots(1, 2)
+        ani = FuncAnimation(plt.gcf(), self.plot_acc_gyr, interval=1000, blit=False)
 
-def start_receive():
-    if not rec.getRunning() and not par.getRunning():
-        input1 = receive_input1.get()
-        input2 = receive_input2.get()
-        input3 = receive_input3.get()
-        Thread(target=rec.main, args=(input1, input2, input3), daemon=True).start()
+        Label(self.window, text="Enter trial type (Default: hallway):").grid(row=1, column=0, padx=3, pady=2)
+        self.receive_input1 = Entry(self.window, width=30)
+        self.receive_input1.grid(row=1, column=1, padx=3, pady=2)
+
+        Label(self.window, text="Enter trial speed (Default: walk):").grid(row=2, column=0, padx=3, pady=2)
+        self.receive_input2 = Entry(self.window, width=30)
+        self.receive_input2.grid(row=2, column=1, padx=3, pady=2)
+
+        Label(self.window, text="Enter CSV file name (Default: exportfile):").grid(row=3, column=0, padx=3, pady=2)
+        self.receive_input3 = Entry(self.window, width=30)
+        self.receive_input3.grid(row=3, column=1, padx=3, pady=2)
+
+        receive_button1 = Button(self.window, text="Start Receive", command=self.start_receive)
+        receive_button1.grid(row=4, column=0, padx=1, pady=2)
+
+        receive_button2 = Button(self.window, text="Stop Receive", command=self.stop_receive)
+        receive_button2.grid(row=4, column=1, padx=1, pady=2)
+
+        log_stationary = Button(self.window, text="Log Zero-Velocity", command=self.log_zv)
+        log_stationary.grid(row=4, column=2, padx=1, pady=2)
+
+        # Parse section
+        Label(self.window, text="Enter trial type (Default: hallway):").grid(row=5, column=0, padx=3, pady=21)
+        self.parse_input1 = Entry(self.window, width=30)
+        self.parse_input1.grid(row=5, column=1, padx=1, pady=2)
+
+        Label(self.window, text="Enter trial speed (Default: walk):").grid(row=6, column=0, padx=3, pady=2)
+        self.parse_input2 = Entry(self.window, width=30)
+        self.parse_input2.grid(row=6, column=1, padx=1, pady=2)
+
+        Label(self.window, text="Enter CSV file name (Default: exportfile):").grid(row=7, column=0, padx=3, pady=2)
+        self.parse_input3 = Entry(self.window, width=30)
+        self.parse_input3.grid(row=7, column=1, padx=1, pady=2)
+
+        parse_button = Button(self.window, text="Parse", command=self.run_parse)
+        parse_button.grid(row=8, column=0)
+
+        debug_button1 = Button(self.window, text="DEBUG count threads", command=self.active_count)
+        debug_button1.grid(row=9, column=0)
+
+        debug_button2 = Button(self.window, text="DEBUG enum threads", command=self.enum_threads)
+        debug_button2.grid(row=9, column=1)
+
+        self.window.mainloop()
 
 
-def stop_receive():
-    # Only runs if receive is running
-    if rec.getRunning():
-        print (str(rec.getRunning()))
-        rec.toggleStop()
-        print ("\nStopped running")
+    def update_data(self):
+        while self.rec.getRunning():
+            data_list = self.rec.getData()
+            if data_list:
+                self.imudata = np.array(data_list)
 
-def log_zv():
-    if rec.getRunning():
-        rec.toggleZV()
-        print ("\nLogged Zero-velocity")
+    def start_receive(self):
+        if not self.rec.getRunning() and not self.par.getRunning():
+            input1 = self.receive_input1.get()
+            input2 = self.receive_input2.get()
+            input3 = self.receive_input3.get()
+            Thread(target=self.rec.main, args=(input1, input2, input3), daemon=True).start()
+            Thread(target=self.update_data, daemon=True).start()
 
-def run_parse():
-    if not rec.getRunning() and not par.getRunning():
-        input1 = receive_input1.get()
-        input2 = receive_input2.get()
-        input3 = receive_input3.get()
-        Thread(target=par.plot_data, args=(input1, input2, input3), daemon=True).start()
+    def stop_receive(self):
+        # Only runs if receive is running
+        if self.rec.getRunning():
+            print (str(self.rec.getRunning()))
+            self.rec.toggleStop()
+            print ("\nStopped running")
 
-# Create the main window
-window = Tk()
-window.geometry('800x500')
-window.title("Simple GUI")
-window.configure(padx=20, pady=20)
+    def log_zv(self):
+        if self.rec.getRunning():
+            self.rec.toggleZV()
+            print ("\nLogged Zero-velocity")
 
-# Receive section
-Label(window, text="Enter trial type (Default: hallway):").grid(row=1, column=0, sticky='w', padx=5, pady=5)
-receive_input1 = Entry(window, width=50)
-receive_input1.grid(row=1, column=1, padx=5, pady=5)
+    def run_parse(self):
+        if not self.rec.getRunning() and not self.par.getRunning():
+            input1 = self.receive_input1.get()
+            input2 = self.receive_input2.get()
+            input3 = self.receive_input3.get()
+            Thread(target=self.par.plot_data, args=(input1, input2, input3), daemon=True).start()
+    
+    def active_count(self):
+        print (threading.active_count())
 
-Label(window, text="Enter trial speed (Default: walk):").grid(row=2, column=0, sticky='w', padx=5, pady=5)
-receive_input2 = Entry(window, width=50)
-receive_input2.grid(row=2, column=1, padx=5, pady=5)
+    def enum_threads(self):
+        for thread in threading.enumerate(): 
+            print(thread.name)
 
-Label(window, text="Enter CSV file name (Default: exportfile):").grid(row=3, column=0, sticky='w', padx=5, pady=5)
-receive_input3 = Entry(window, width=50)
-receive_input3.grid(row=3, column=1, padx=5, pady=5)
+    def plot_acc_gyr(self, i):
+        # Get all axes of figure
+        ax1, ax2 = plt.gcf().get_axes()
+        # Clear current data
+        ax1.cla()
+        ax2.cla()
+        data = self.imudata[-250:]
+        indices = np.arange(len(self.imudata))[-250:]
+        # Plot new data
+        ax1.plot(indices, data[:,0]/9.8, label='x')
+        ax1.plot(indices, data[:,1]/9.8, label='y')
+        ax1.plot(indices, data[:,2]/9.8, label='z')
+        ax1.set_title('Linear Acceleration')
+        ax1.set_ylabel('Linear Acceleration (Gs)')
+        ax1.legend()
+        ax1.grid()
 
-receive_button1 = Button(window, text="Start Receive", command=start_receive)
-receive_button1.grid(row=4, column=0, columnspan=2, pady=5)
+        ax2.plot(indices, data[:,3]*180/np.pi, label='x')
+        ax2.plot(indices, data[:,4]*180/np.pi, label='y')
+        ax2.plot(indices, data[:,5]*180/np.pi, label='z')
+        ax2.set_title('Angular Velocity')
+        ax2.set_ylabel('Angular Velocity (deg/s)')
+        ax2.legend()
+        ax2.grid()
 
-receive_button2 = Button(window, text="Stop Receive", command=stop_receive)
-receive_button2.grid(row=5, column=0, columnspan=2, pady=5)
-
-log_stationary = Button(window, text="Log Zero-Velocity", command=log_zv)
-log_stationary.grid(row=6, column=0, columnspan=2, pady=5)
-
-# Parse section
-Label(window, text="Enter trial type (Default: hallway):").grid(row=7, column=0, sticky='w', padx=5, pady=5)
-parse_input1 = Entry(window, width=50)
-parse_input1.grid(row=7, column=1, padx=5, pady=5)
-
-Label(window, text="Enter trial speed (Default: walk):").grid(row=8, column=0, sticky='w', padx=5, pady=5)
-parse_input2 = Entry(window, width=50)
-parse_input2.grid(row=8, column=1, padx=5, pady=5)
-
-Label(window, text="Enter CSV file name (Default: exportfile):").grid(row=9, column=0, sticky='w', padx=5, pady=5)
-parse_input3 = Entry(window, width=50)
-parse_input3.grid(row=9, column=1, padx=5, pady=5)
-
-parse_button = Button(window, text="Parse", command=run_parse)
-parse_button.grid(row=10, column=0, columnspan=2, pady=5)
-
-#########################
-
-def active_count():
-    print (threading.active_count())
-
-def enum_threads():
-    for thread in threading.enumerate(): 
-        print(thread.name)
-
-debug_button1 = Button(window, text="DEBUG count threads", command=active_count)
-debug_button1.grid(row=11, column=0, columnspan=1, pady=1)
-
-debug_button2 = Button(window, text="DEBUG enum threads", command=enum_threads)
-debug_button2.grid(row=11, column=1, columnspan=1, pady=1)
-
-# Run the window
-window.mainloop()
+if __name__ == '__main__':
+    INS_App() 

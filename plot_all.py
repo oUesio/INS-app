@@ -1,30 +1,12 @@
 from PIL import Image    
 import glob
 import os 
-from ins_tools.util import *
-import ins_tools.visualize as visualize
-from ins_tools.INS import INS
-
 from decimal import Decimal
-
-def plot_data(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, temp_sigma_vel, temp_acc, temp_gyro):# approx, estim):
-    # Gets the imu data from csv file
-    with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'), mode="r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        imu = np.array([list(map(float, row)) for row in reader], dtype=float) 
-
-    # sigma_a = 0.00098, sigma_w = 8.7266463e-5
-    ins = INS(imu, sigma_a = a, sigma_w = w, T=freq, temp_sigma_vel=temp_sigma_vel, temp_acc=temp_acc, temp_gyro=temp_gyro) #microstrain
-    zv = ins.Localizer.compute_zv_lrt(W=win, G=thresh, detector=det)
-    x = ins.baseline(zv=zv)
-
-    visualize.plot_topdown(x, title='{}'.format(file_name.replace('exportfile', '').replace('_', '')), save_dir='results/%s' % (file_name.replace('exportfile', '').replace('_', '')), zv=zv, approx=approx, estim=estim) ####
-    visualize.plot_vertical(x, title='{}'.format(file_name.replace('exportfile', '').replace('_', '')), save_dir='results_vert/%s' % (file_name.replace('exportfile', '').replace('_', '')), zv=zv) ####
+from tools import plot_data_temp
+import numpy as np
+import matplotlib.pyplot as plt
 
 det = 'shoe'
-thresh = 2e8 #8.5e7 #zero-velocity threshold #1.5e7
-win = 5   #window size 5
 
 trial_speed = ['run', 'walk', ''][1]
 trial_type = ['hallway', 'stairs'][0]
@@ -32,21 +14,44 @@ approx = False ####
 estim = True ####
 freq = 1/100
 
+#2.00E+08_5_0.00098_9.20E-05_0.005_1_0.5
+'''thresh = 2e8 #8.5e7 #zero-velocity threshold #1.5e7
 win = 5 # 5
-a = 0.00098 # 0.00098
-w = 8.7266463e-5 # 9.2e-5 # 
-vel = 0.01 # 0.01
-acc = 0.5 # 1 # 
+sig_a = 0.00098 # 0.00098
+sig_w = 9.2e-5 # 8.7266463e-5
+sig_vel = 0.005 # 0.01
+acc = 1 # 0.5
+gyr = 0.5 # 0.5'''
+
+thresh = 1.5e6 #8.5e7 #zero-velocity threshold #1.5e7
+win = 5 # 5
+sig_a = 0.035234433782004124 # 0.00098
+sig_w = 0.0008884048317068069 # 8.7266463e-5
+sig_vel = 0.01 # 0.01
+acc = 0.5 # 0.5
 gyr = 0.5 # 0.5
 
-'''files = glob.glob('data/hallway/walk/*.csv')
-remove = ['data/hallway/walk/exportfile.csv', 'data/hallway/walk/exportfileMAIN.csv', 'data/hallway/walk/exportfiletest.csv']
+print (sig_a)
+print (sig_w)
+
+'''
+	0.007  5.2 × 10⁻⁵  0.0007
+Accelerometer stat:  [0.01043317 0.01058136 0.12949975] - 0.07525733954408477
+Gyroscope stat:  [0.00099735 0.00083695 0.00090819] - 0.0009165153937787042
+Accelerometer stat1:  [0.01046322 0.0102999  0.05923537] - 0.035234433782004124
+Gyroscope stat1:  [0.00091955 0.00086209 0.00088262] - 0.0008884048317068069
+'''
+
+files = glob.glob('data/hallway/walk/*.csv')
+remove = ['data/hallway/walk/stationary.csv', 'data/hallway/walk/stationary1.csv', 'data/hallway/walk/exportfile.csv', 'data/hallway/walk/exportfileMAIN.csv', 'data/hallway/walk/exportfiletest.csv']
 files = [os.path.basename(x).replace('.csv', '') for x in files if x not in remove]
+#print (len(files))
 
 for filename in files:
-    plot_data(det, win, thresh, trial_type, trial_speed, filename, freq, a, w, vel, acc, gyr)'''
+    #print (filename)
+    plot_data_temp(det, win, thresh, trial_type, trial_speed, filename, freq, sig_a, sig_w, sig_vel, acc, gyr, approx, estim)
 
-all = False
+all = True
 
 if all:
     image_files = sorted(glob.glob("results_vert/*.png"))
@@ -57,6 +62,7 @@ if all:
     output_width = cols * img_width
     output_height = rows * img_height
     if len(image_files) != 17:
+        plt.close('all')
         raise ValueError("Expected exactly 17 images, but found {}".format(len(image_files)))
     combined_image2 = Image.new("RGB", (output_width, output_height), (255, 255, 255))
     for index, img in enumerate(images):
@@ -69,6 +75,7 @@ if all:
     image_files = sorted(image_files, key=lambda x: os.path.basename(x).lower())
     images = [Image.open(img) for img in image_files]
     if len(image_files) != 17:
+        plt.close('all')
         raise ValueError("Expected exactly 17 images, but found {}".format(len(image_files)))
     combined_image1 = Image.new("RGB", (output_width, output_height), (255, 255, 255))
     for index, img in enumerate(images):
@@ -83,7 +90,7 @@ if all:
     final_combined_image.paste(combined_image1, (0, 0))  # Place first combined image on top
     final_combined_image.paste(combined_image2, (0, output_height))  # Place second below
 
-    final_combined_image.save("combined_graph_win5_%s.png" % ('%.2E' % Decimal(thresh)), quality=60, optimize=True)
+    final_combined_image.save("test_all/combined_graph_test2_%s.png" % ('%.2E' % Decimal(thresh)), quality=60, optimize=True)
 else:
     image_files = sorted(glob.glob("results/*.png"))  # Adjust pattern to match your file names
     image_files = sorted(image_files, key=lambda x: os.path.basename(x).lower())
@@ -101,4 +108,4 @@ else:
         x_offset = (index % cols) * img_width
         y_offset = (index // cols) * img_height
         combined_image.paste(img, (x_offset, y_offset))
-    combined_image.save("combined_graph_%s.png" % ('%.2E' % Decimal(thresh)))
+    combined_image.save("test_all/combined_graph_%s.png" % ('%.2E' % Decimal(thresh)))

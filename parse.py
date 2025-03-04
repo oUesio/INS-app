@@ -56,7 +56,6 @@ class Parse:
             if trial_speed == 'walk':
                 trial = 'Walking Trial'
 
-            print ('15. Plot')
             visualize.plot_topdown(x, title='{} (Top-Down View)'.format(trial), save_dir='results/%s_%s_%s_%s.png' % ('hallway', trial_speed, file_name, '%.2E' % Decimal(thresh)), legend=legend, zv=zv)
             print("My program took", time.time() - start_time, "to run")
             self.toggleRunning()

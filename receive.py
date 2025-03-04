@@ -42,14 +42,16 @@ class XdaCallback(xda.XsCallback):
         acc = packet.calibratedAcceleration()
         gyr = packet.calibratedGyroscopeData()
 
-        data = {
+        '''data = {
                 "AccX": acc[0],
                 "AccY": acc[1],
                 "AccZ": acc[2],
                 "GyrX": gyr[0],
                 "GyrY": gyr[1],
                 "GyrZ": gyr[2],
-            }
+            }'''
+        
+        data = list(acc)+list(gyr)
         
         self.data_list.append(data) 
         #print(data)
@@ -65,6 +67,9 @@ class XdaCallback(xda.XsCallback):
 
     def getLengthData(self):
         return len(self.data_list)
+
+    def getData(self):
+        return self.data_list
     
     def toggleZV(self):
         self.m_lock.acquire()
@@ -75,7 +80,7 @@ class Receive:
     def __init__(self):
         self.stop = False
         self.running = False
-        self.callback = None #### DELETE IF REMOVE MANUALLY LOG STATIONARY PHASE
+        self.callback = XdaCallback() 
 
     def getStop(self):
         return self.stop
@@ -92,9 +97,12 @@ class Receive:
     def toggleZV(self): ####
         self.callback.toggleZV() ####
 
+    def getData(self):
+        return self.callback.data_list
+
     def main(self, trial_type, trial_speed, file_name):
         self.toggleRunning()
-        self.callback = XdaCallback() #### RESETS OR INITS THE OBJECT
+        self.callback = XdaCallback() # Resets callback
         # Default values
         if not trial_type:
             trial_type = "hallway"
@@ -134,16 +142,15 @@ class Receive:
             ####################
 
             # Open the communication port for the device
-            print (mt_port.portName())
-            print (mt_port.baudrate()) # 115200 bps
-            temp = [xda.XBR_230k4, xda.XBR_460k8, xda.XBR_921k6 , xda.XBR_2000k , xda.XBR_3500k , xda.XBR_4000k]
+            #print (mt_port.portName())
+            #print (mt_port.baudrate()) # 115200 bps
+            #temp = [xda.XBR_230k4, xda.XBR_460k8, xda.XBR_921k6 , xda.XBR_2000k , xda.XBR_3500k , xda.XBR_4000k]
             '''
             for x in temp:
                 print (x)
                 print (str(x) + ': ' + str(control.openPort(mt_port.portName(), x)))
                 '''
 
-            #return
             if not control.openPort(mt_port.portName(), mt_port.baudrate()):
                 raise RuntimeError("Could not open port. Aborting.")
 
@@ -155,7 +162,6 @@ class Receive:
             ####################
 
             # Create and attach callback handler to device
-            # callback = XdaCallback() #### UNCOMMENT AND REPLACE ALL SELF.CALLBACK 
             device.addCallbackHandler(self.callback)
 
             # Put the device into configuration mode before configuring the device
@@ -218,8 +224,12 @@ class Receive:
             print ("Frequency: ", round(length / runtime, 2))
             ####################
 
-            tools.export_csv(os.path.join('data',trial_type,trial_speed,file_name), self.callback.data_list)
-            print("CSV file created: "+file_name+'.csv')
+            #tools.export_csv(os.path.join('data',trial_type,trial_speed,file_name), self.callback.data_list)
+            with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'),"w", newline="") as file: ####
+                writer = csv.writer(file)
+                writer.writerow(['AccX','AccY','AccZ','GyrX','GyrY','GyrZ'])
+                writer.writerows(self.callback.data_list)
+            print("CSV file created: "+file_name+'.csv')    
 
             with open('test_zv.csv',"w", newline="") as file: ####
                 writer = csv.writer(file) ####
