@@ -22,12 +22,6 @@ def read_imu_csv(csv_file):
 
 def plot_data(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, temp_sigma_vel, temp_acc, temp_gyro, approx, estim):# approx, estim):
     start_time = time.time()
-    '''    # Gets the imu data from csv file
-    with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'), mode="r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        imu = np.array([list(map(float, row)) for row in reader], dtype=float) '''
-
     imu = read_imu_csv(os.path.join('data',trial_type,trial_speed,file_name+'.csv'))
 
     # sigma_a = 0.00098, sigma_w = 8.7266463e-5
@@ -55,12 +49,6 @@ def plot_data(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, 
     print("My program took", time.time() - start_time, "to run")
 
 def plot_data_temp(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, temp_sigma_vel, temp_acc, temp_gyro, approx, estim):# approx, estim):
-    # Gets the imu data from csv file
-    '''with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'), mode="r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        imu = np.array([list(map(float, row)) for row in reader], dtype=float) '''
-    
     imu = read_imu_csv(os.path.join('data',trial_type,trial_speed,file_name+'.csv'))
 
     # sigma_a = 0.00098, sigma_w = 8.7266463e-5
@@ -72,11 +60,6 @@ def plot_data_temp(det, win, thresh, trial_type, trial_speed, file_name, freq, a
     visualize.plot_vertical(x, title='{}'.format(file_name.replace('exportfile', '').replace('_', '')), save_dir='results_vert/%s' % (file_name.replace('exportfile', '').replace('_', '')), zv=zv) ####
 
 def calc_dist(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, temp_sigma_vel, temp_acc, temp_gyro):
-    # Gets the imu data from csv file
-    '''with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'), mode="r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        imu = np.array([list(map(float, row)) for row in reader], dtype=float) '''
     imu = read_imu_csv(os.path.join('data',trial_type,trial_speed,file_name+'.csv'))
 
     # sigma_a = 0.00098, sigma_w = 8.7266463e-5

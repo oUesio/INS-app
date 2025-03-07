@@ -36,6 +36,7 @@ class MainWindow(QMainWindow):
         self.threadpool = QThreadPool()
 
         self.imudata = np.zeros((250, 6))  # Initialize with empty data
+        self.x = None
         self.setFixedSize(QSize(1050, 700))
         self.setWindowTitle("Simple GUI")
 
@@ -63,9 +64,6 @@ class MainWindow(QMainWindow):
         receive_button2 = QPushButton("Stop Receive")
         receive_button2.clicked.connect(self.stop_receive)
         receive_layout2.addWidget(receive_button2, 0, 1)
-        log_stationary = QPushButton("Log Zero-Velocity")
-        log_stationary.clicked.connect(self.log_zv)
-        receive_layout2.addWidget(log_stationary, 0, 2)
 
         parse_layout1.addWidget(QLabel("Enter trial type (Default: hallway):"), 0, 0)
         self.parse_input1 = QLineEdit(self)
@@ -104,6 +102,8 @@ class MainWindow(QMainWindow):
         window2_layout.addWidget(self.canvas1)
         self.canvas2 = MplCanvas(self, width=4.5, height=4, dpi=100)
         window2_layout.addWidget(self.canvas2)
+        self.canvas3 = MplCanvas(self, width=4.5, height=4, dpi=100)
+        window2_layout.addWidget(self.canvas3)
 
         # Full window
         window1 = QWidget()
@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
         window1.setLayout(window1_layout)
 
         window2 = QWidget()
-        window2.setFixedSize(700, 350)
+        window2.setFixedSize(1050, 350)
         window2.setLayout(window2_layout)
 
         full_window_layout = QVBoxLayout()
@@ -122,7 +122,7 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(full_window)
 
-    def update_plot(self):
+    def update_raw_plot(self):
         data = self.imudata[-250:]
         indices = np.arange(len(self.imudata))[-250:]
         self.canvas1.axes.cla()
@@ -147,13 +147,28 @@ class MainWindow(QMainWindow):
         self.canvas2.axes.grid()
         self.canvas2.draw()
 
+    def update_position_plot(self):
+        if self.x is not None:
+            traj = self.x 
+            self.canvas3.axes.clf()
+            self.canvas3.axes.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue')
+            self.canvas3.axes.set_xlabel('x (m)', fontsize=12)
+            self.canvas3.axes.set_ylabel('y (m)', fontsize=12)
+            self.canvas3.axes.tick_params(labelsize=12)
+            self.canvas3.fig.subplots_adjust(top=0.8)
+            self.canvas3.axes.grid()
+            self.canvas3.axes.axis('square')    
+            self.canvas3.draw() 
+
     def update_data(self): 
         while self.rec.getRunning():
-            data_list = self.rec.getData()
+            data_list = self.rec.getRawData()
+            #x = self.rec.getPositions()
+            #print (len(x)) 
             if data_list:
                 self.imudata = np.array(data_list)
-                print (len(self.imudata))
-                self.update_plot()
+                #print (len(self.imudata))
+                self.update_raw_plot()
             time.sleep(0.25)
             
     def start_receive(self):
@@ -169,23 +184,18 @@ class MainWindow(QMainWindow):
     def stop_receive(self):
         # Only runs if receive is running
         if self.rec.getRunning():
-            print (str(self.rec.getRunning()))
             self.rec.toggleStop()
             print ("\nStopped running")
-
-    def log_zv(self):
-        pass
-        '''if self.rec.getRunning():
-            self.rec.toggleZV()
-            print ("\nLogged Zero-velocity")'''
+            #self.canvas3.fig.savefig('results/test.png', dpi=400, bbox_inches='tight')
 
     def run_parse(self):
-        pass
-        '''if not self.rec.getRunning() and not self.par.getRunning():
+        if not self.rec.getRunning() and not self.par.getRunning():
             input1 = self.receive_input1.text()
             input2 = self.receive_input2.text()
             input3 = self.receive_input3.text()
-            Thread(target=self.par.plot_data, args=(input1, input2, input3), daemon=True).start()'''
+            rec_main = Worker(self.par.plot_data, input1, input2, input3)
+            self.threadpool.start(rec_main)
+            # plot data in gui
 
     def active_count(self):
         print (threading.active_count())
