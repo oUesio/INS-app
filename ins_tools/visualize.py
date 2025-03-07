@@ -2,12 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 
-def plot_topdown(traj, title=None, save_dir=None, zv=[], approx=True, estim=True):
-    with open('test_zv.csv', mode="r") as f: ####
-        reader = csv.reader(f) ####
-        next(reader) ####
-        data = [int(row) for row in f]  ####
-
+def plot_topdown(traj, title=None, save_dir=None, zv=[], estim=True):
     #traj = traj[:2500]
     #zv = zv[:2500]
 
@@ -15,18 +10,12 @@ def plot_topdown(traj, title=None, save_dir=None, zv=[], approx=True, estim=True
     plt.clf()
     plt.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue')
 
-    legend = ['SHOE'] ####
+    legend = ['SHOE'] 
     if estim:
         if len(zv) != 0:
             traj_true = traj[zv]  # Select points where zv is True
             plt.scatter(-traj_true[:, 0], traj_true[:, 1], color='red', s=30)
             legend.append('Estimated ZV')
-
-    if approx: ####
-        if len(data) > 0: ####
-            traj_data = traj[data]  # Select points using indexes from CSV ####
-            plt.scatter(-traj_data[:, 0], traj_data[:, 1], facecolors='none', color='green', s=30) ####
-            legend.append('Approx actual ZV') ####
 
     if title != None:
         plt.title(title, fontsize=16, color='black')
@@ -35,7 +24,6 @@ def plot_topdown(traj, title=None, save_dir=None, zv=[], approx=True, estim=True
     plt.tick_params(labelsize=12)
     plt.subplots_adjust(top=0.8)
     plt.legend(legend, fontsize=10, numpoints=1)
-    # plt.legend(['SHOE'], fontsize=15, numpoints=1) ####
     plt.grid()
     plt.axis('square') 
     if save_dir:
@@ -56,7 +44,7 @@ def plot_vertical(traj, T=1.0/100, title=None, save_dir=None, zv=[]):
         time_values = np.arange(0, num_points * T, T)
         plt.plot(time_values, traj[:,2], linewidth = 1, color='blue')
  
-    legend = ['SHOE'] ####
+    legend = ['SHOE'] 
     if len(zv) != 0:
         time_zv = time_values[zv]
         traj_zv = traj[zv, 2]
