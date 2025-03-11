@@ -9,35 +9,45 @@ sys.path.append('../')
 import matplotlib.pyplot as plt #################
 
 class Localizer():
-    def __init__(self, config, imudata):
+    def __init__(self, config, imubatch):
         # config: A dictionary of configuration parameters
         self.config = config
-        self.imudata = imudata # will only be initial batch imudata
-    def init(self):
-        imudata = self.imudata 
-        # Initialise state to be at 0
-        x = np.zeros((imudata.shape[0],9))
-        # #Initialise quaternion 
-        q = np.zeros((imudata.shape[0],4))
-        avg_x = np.mean(imudata[0:20,0])
-        avg_y = np.mean(imudata[0:20,1])
-        avg_z = np.mean(imudata[0:20,2]) #gets avg accelerometer values for finding roll/pitch
-        
+
+        # Initialise the first batch
+        self.x = np.zeros((imubatch.shape[0],9))
+        self.q = np.zeros((imubatch.shape[0],4))
+        self.P_hat = np.zeros((imubatch.shape[0],9,9))
+
+        avg_x = np.mean(imubatch[0:20,0])
+        avg_y = np.mean(imubatch[0:20,1])
+        avg_z = np.mean(imubatch[0:20,2]) #gets avg accelerometer values for finding roll/pitch
+
         heading = 0
         roll = np.arctan2(-avg_y,-avg_z)
         pitch = np.arctan2(avg_x,np.sqrt(avg_y*avg_y + avg_z*avg_z))
-           
-        attitude = np.array([roll, pitch, heading])
-        x[0, 6:9] = attitude
-        q[0, :] = euler2quat(roll, pitch, heading, 'sxyz')
 
-        # Initialise covariance matrix P
-        P_hat = np.zeros((imudata.shape[0],9,9))
-        P_hat[0,0:3,0:3] = np.power(1e-5,2)*np.identity(3) #position (x,y,z) variance
-        P_hat[0,3:6,3:6] = np.power(1e-5,2)*np.identity(3) #velocity (x,y,z) variance
-        P_hat[0,6:9,6:9] = np.power(0.1*np.pi/180,2)*np.identity(3) #np.power(0.1*np.pi/180,2)*np.identity(3)
-        return x, q, P_hat
+        attitude = np.array([roll, pitch, heading])
+        # first timestamp 
+        self.x[0, 6:9] = attitude # first timestamp 
+        self.q[0, :] = euler2quat(roll, pitch, heading, 'sxyz')
+        self.P_hat[0,0:3,0:3] = np.power(1e-5,2)*np.identity(3) #position (x,y,z) variance
+        self.P_hat[0,3:6,3:6] = np.power(1e-5,2)*np.identity(3) #velocity (x,y,z) variance
+        self.P_hat[0,6:9,6:9] = np.power(0.1*np.pi/180,2)*np.identity(3)
     
+    def getXQP(self): # return references
+        return self.x, self.q, self.P_hat
+    
+    # Replaces the previous batch with new empty batch with the first value the last value the previous batch
+    def nextBatch(self, imushape):
+        x = np.zeros((imushape,9))
+        q = np.zeros((imushape,4))
+        P_hat = np.zeros((imushape,9,9))     
+        x[0] = self.x[-1]
+        q[0] = self.q[-1]
+        P_hat[0] = self.P_hat[-1]
+        self.x, self.q, self.P_hat = x, q, P_hat
+        return self.x, self.q, self.P_hat
+        
     # Updates the state vector based on the motion model
     def nav_eq(self,xin,imu,qin,dt):
         #update Quaternions

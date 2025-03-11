@@ -11,7 +11,7 @@ class INS():
         "T": T,
             }
         # Stores the input IMU data
-        self.imudata = imudata
+        #self.imudata = imudata
         # Noise standard deviations
         self.sigma_a = self.config["sigma_a"]
         self.sigma_w = self.config["sigma_w"]
@@ -22,13 +22,11 @@ class INS():
 
         self.g = self.config["g"]
         self.T = self.config["T"]
-        ##process noise in body frame
         # Variances of the accelerometer and gyroscope noise
         self.sigma_acc = temp_acc*np.ones((1,3))
         self.var_acc = np.power(self.sigma_acc,2)
         self.sigma_gyro = temp_gyro*np.ones((1,3))*np.pi/180
         self.var_gyro = np.power(self.sigma_gyro,2)
-        ##process noise covariance matrix Q
         # Combines the variances of accelerometer and gyroscope noises into a covariance matrix
         self.Q = np.zeros((6,6)) 
         self.Q[0:3,0:3] = self.var_acc*np.identity(3)
@@ -43,21 +41,24 @@ class INS():
         # Measurement matrix mapping state to velocity measurements
         self.H = np.zeros((3,9))
         self.H[0:3,3:6] = np.identity(3)
-        self.config["H"]= self.H        
+        self.config["H"]= self.H      
+
         # Localizer instance for EKF updates
+        # Initialises the state vector, quaternion, and state covariance using the Localizer
         self.Localizer = Localizer(self.config, imudata)
-        self.x_check, self.q, self.P = self.Localizer.init() # store intial values
+        self.x_check, self.q, self.P = self.Localizer.getXQP()
+        #self.x_check, self.q, self.P = self.Localizer.init() # store intial values
         
     # Performs the core navigation computation
-    def baseline(self, imudata, G=5e8, zv=None):
-        #imudata = self.imudata
-        
-        # Initialises the state vector, quaternion, and state covariance using the Localizer
-        #x_check, q, P = self.Localizer.init() #initialize state
-        x_hat = self.x_check
-        self.x = x_hat
+    def baseline(self, imudata, zv, init, G=5e8):
+        if init is False: # 3 attributes already made when INS initialised
+            self.x_check, self.q, self.P = self.Localizer.nextBatch(imudata.shape[0])
+
+        x_hat = self.x_check # save the data for next batch
+        self.x = x_hat.copy() # copy that is returned
+
         self.zv = zv
-        for k in range(1,self.x_check.shape[0]):      
+        for k in range(1,self.x_check.shape[0]): # STARTS AT 1 BEFOE THE FIRST VALUE WAS GOTTENT FROM INIT
             dt = self.config['T']
             # State prediction, predict next state based on previous step
             self.x_check[k,:], self.q[k,:],Rot = self.Localizer.nav_eq(self.x_check[k-1,:], imudata[k,:], self.q[k-1,:], dt) #update state through motion model
