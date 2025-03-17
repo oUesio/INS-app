@@ -26,9 +26,14 @@ class Worker(QRunnable):
 
     @pyqtSlot()
     def run(self):
-        self.fn(*self.args, **self.kwargs)
+        try:
+            self.fn(*self.args, **self.kwargs)
+        except Exception as e:
+            print(f"Worker thread crashed: {e}")
 
 class MainWindow(QMainWindow):
+    #update_plot_signal = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.rec = Receive()
@@ -36,7 +41,7 @@ class MainWindow(QMainWindow):
         self.threadpool = QThreadPool()
 
         self.imudata = np.zeros((250, 6))  # Initialize with empty data
-        self.x = None
+        self.states = None
         self.setFixedSize(QSize(1050, 700))
         self.setWindowTitle("Simple GUI")
 
@@ -105,6 +110,10 @@ class MainWindow(QMainWindow):
         self.canvas3 = MplCanvas(self, width=4.5, height=4, dpi=100)
         window2_layout.addWidget(self.canvas3)
 
+        #self.update_plot_signal.connect(self.update_raw_plot)
+        #self.timer = QTimer()
+        #self.timer.timeout.connect(self.update_data)
+
         # Full window
         window1 = QWidget()
         window1.setFixedSize(500, 350)
@@ -148,45 +157,60 @@ class MainWindow(QMainWindow):
         self.canvas2.draw()
 
     def update_position_plot(self):
-        if self.x is not None:
-            traj = self.x 
-            self.canvas3.axes.clf()
-            self.canvas3.axes.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue')
-            self.canvas3.axes.set_xlabel('x (m)', fontsize=12)
-            self.canvas3.axes.set_ylabel('y (m)', fontsize=12)
-            self.canvas3.axes.tick_params(labelsize=12)
-            self.canvas3.fig.subplots_adjust(top=0.8)
-            self.canvas3.axes.grid()
-            self.canvas3.axes.axis('square')    
-            self.canvas3.draw() 
+        traj = self.states 
+        self.canvas3.axes.cla()
+        self.canvas3.axes.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue')
+        self.canvas3.axes.set_xlabel('x (m)', fontsize=12)
+        self.canvas3.axes.set_ylabel('y (m)', fontsize=12)
+        self.canvas3.axes.tick_params(labelsize=12)
+        self.canvas3.fig.subplots_adjust(top=0.8)
+        self.canvas3.axes.grid()
+        self.canvas3.axes.axis('square')    
+        self.canvas3.draw() 
 
     def update_data(self): 
+        print ('Updater Started')
         while self.rec.getRunning():
+
+            '''if not self.rec.getRunning():
+                self.timer.stop()
+                return'''
+            
             data_list = self.rec.getRawData()
-            #x = self.rec.getPositions()
-            #print (len(x)) 
-            if data_list:
+            states = self.rec.getStates()
+            if states is not None:
+                self.states = states ####
+                #print ("estimates gui: "+str(len(states)))
+                self.update_position_plot()
+            if data_list: # Empty list
                 self.imudata = np.array(data_list)
-                #print (len(self.imudata))
+                #print ("data list: "+ str(len(data_list)))
                 self.update_raw_plot()
-            time.sleep(0.25)
+
+                #self.update_plot_signal.emit()
+                time.sleep(0.25)
             
     def start_receive(self):
+        print ('Receive Started')
         if not self.rec.getRunning() and not self.par.getRunning():
+            self.imudata = np.zeros((250, 6))
+            self.states = None
             input1 = self.receive_input1.text()
             input2 = self.receive_input2.text()
             input3 = self.receive_input3.text()
             rec_main = Worker(self.rec.main, input1, input2, input3)
             self.threadpool.start(rec_main)
-            update = Worker(self.update_data) # NOT ALWAYS RUN FOR SOME REASON
+            update = Worker(self.update_data) 
             self.threadpool.start(update)
+            #self.timer.start(1000)
 
     def stop_receive(self):
         # Only runs if receive is running
         if self.rec.getRunning():
             self.rec.toggleStop()
+            #self.timer.stop()
             print ("\nStopped running")
-            #self.canvas3.fig.savefig('results/test.png', dpi=400, bbox_inches='tight')
+            self.canvas3.fig.savefig('results/test.png', dpi=400, bbox_inches='tight')
 
     def run_parse(self):
         if not self.rec.getRunning() and not self.par.getRunning():

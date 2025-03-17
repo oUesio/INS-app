@@ -26,7 +26,7 @@ def plot_data(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, 
 
     # sigma_a = 0.00098, sigma_w = 8.7266463e-5
     ins = INS(imu, sigma_a = a, sigma_w = w, T=freq, temp_sigma_vel=temp_sigma_vel, temp_acc=temp_acc, temp_gyro=temp_gyro) #microstrain
-    zv = ins.Localizer.compute_zv_lrt(W=win, G=thresh, detector=det)
+    zv = ins.Localizer.compute_zv_lrt(W=win, G=thresh)
     x = ins.baseline(zv=zv)
 
     if trial_type == 'hallway':
@@ -39,7 +39,7 @@ def plot_data(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, 
             trial = 'Walking Trial'
     if trial_type == 'stairs':
         trial = 'Stair Climbing Trial'
-    visualize.plot_topdown(x, title='{} (Top-Down View)'.format(trial), save_dir='results/%s_%s_%s_topdown.png' % (trial_type, file_name, '%.2E' % Decimal(thresh)), zv=zv, approx=approx, estim=estim) ####
+    visualize.plot_topdown(x, title='{} (Top-Down View)'.format(trial), save_dir='results/%s_%s_%s_topdown.png' % (trial_type, file_name, '%.2E' % Decimal(thresh)), zv=zv) ####
     visualize.plot_vertical(x, T=freq, title='{} (Vertical View)'.format(trial), save_dir='results/%s_%s_%s_vert.png' % (trial_type, file_name, '%.2E' % Decimal(thresh)), zv=zv)
     visualize.plot_acc(x,'results/temp_acc.png')
     visualize.plot_vel(x,'results/temp_vel.png')
@@ -56,8 +56,8 @@ def plot_data_temp(det, win, thresh, trial_type, trial_speed, file_name, freq, a
     zv = ins.Localizer.compute_zv_lrt(W=win, G=thresh, detector=det)
     x = ins.baseline(zv=zv)
 
-    visualize.plot_topdown(x, title='{}'.format(file_name.replace('exportfile', '').replace('_', '')), save_dir='results/%s' % (file_name.replace('exportfile', '').replace('_', '')), zv=zv, approx=approx, estim=estim) ####
-    visualize.plot_vertical(x, title='{}'.format(file_name.replace('exportfile', '').replace('_', '')), save_dir='results_vert/%s' % (file_name.replace('exportfile', '').replace('_', '')), zv=zv) ####
+    visualize.plot_topdown(x, title='{}'.format(file_name.replace('exportfile', '').replace('_', '')), save_dir='results/%s' % (file_name.replace('exportfile', '').replace('_', '')), zv=zv) 
+    visualize.plot_vertical(x, title='{}'.format(file_name.replace('exportfile', '').replace('_', '')), save_dir='results_vert/%s' % (file_name.replace('exportfile', '').replace('_', '')), zv=zv) 
 
 def calc_dist(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, temp_sigma_vel, temp_acc, temp_gyro):
     imu = read_imu_csv(os.path.join('data',trial_type,trial_speed,file_name+'.csv'))

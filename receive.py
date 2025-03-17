@@ -63,7 +63,7 @@ class Receive:
         self.running = False
         self.callback = XdaCallback() 
         self.realtime = None
-        self.x = None
+        self.states = None
 
     def getStop(self):
         return self.stop
@@ -80,8 +80,8 @@ class Receive:
     def getRawData(self):
         return self.callback.data_list
     
-    def getPositions(self):
-        return self.x
+    def getStates(self):
+        return self.states
 
     def main(self, trial_type, trial_speed, file_name):
         self.toggleRunning()
@@ -161,19 +161,23 @@ class Receive:
             ####################
 
             # Main loop
-            size = 0
+            batch_pointer = 0 # keeps track of last processed position
+            W = 5 # window size used by zero velocity detector
             while not self.stop:
                 current_data_list = np.array(self.callback.data_list)
-                if self.realtime is None and len(current_data_list) > 100: # arbitrary number, initial
-                    print ('initial realtime ins')
-                    self.realtime = realtime.RealTime(INS(current_data_list, sigma_a = 0.00098, sigma_w = 9.20E-05, T=1/100, temp_sigma_vel=0.005, temp_acc=0.3, temp_gyro=1), 5, 2.20E+08) # initial ins
-                if len(current_data_list) > size+100: # controls how often make estimates
-                    print ('data size: '+ str(len(current_data_list)))
-                    self.x, size = self.realtime.estimates(current_data_list) # estimates using full
+                length = len(current_data_list)
+                if length > batch_pointer+100: # controls how often make estimates
+                    init = self.realtime is None
+                    batch_size = (((length - batch_pointer) // W) * W) - (not init) # 5n size if initial, 5n - 1 to account for last value of previous batch
+                    if init:
+                        self.realtime = realtime.RealTime(INS(current_data_list[:batch_size], sigma_a = 0.00098, sigma_w = 9.20E-05), W, 2.20E+08) # initial ins
+                    batch_estimates = self.realtime.estimates(current_data_list[batch_pointer-(not init):batch_pointer+batch_size], init) 
+                    # resets states as well if it had values from before
+                    self.states = batch_estimates if init else np.concatenate((self.states, batch_estimates)) # extra first value already removed
+                    batch_pointer += batch_size
 
             # Stop recording data
             if not device.stopRecording(): 
-                self.toggleRunning()
                 raise RuntimeError("Failed to stop recording. Aborting.")
 
             device.removeCallbackHandler(self.callback)

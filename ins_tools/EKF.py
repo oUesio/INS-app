@@ -145,14 +145,13 @@ class Localizer():
         return zupt
         
     ### if a custom zero-velocity detector was added as a function above, additionally modify this list:    
-    def compute_zv_lrt(self, W=5, G=3e8, detector='shoe', return_zv=True): #import window size, zv-threshold
+    def compute_zv_lrt(self, W=5, G=3e8, return_zv=True): #import window size, zv-threshold
         # Compares likelihoods  against a threshold to determine whether zero velocity is detected
-        if detector=='shoe':    
-            zv = self.SHOE(W=W)
+        zv = self.SHOE(W=W)
         #################
-        '''        #data = np.array(zv[1500:3750])
+        data = np.array(zv[0:2500])
         plt.figure(figsize=(13, 5))
-        plt.plot(range(len(zv)), zv, linestyle='-', color='b')
+        plt.plot(range(len(data)), data, linestyle='-', color='b')
         plt.axhline(y=G, color='r', linestyle='--')
 
         # Labels and title
@@ -160,8 +159,8 @@ class Localizer():
         plt.ylabel('ZV')
         plt.title('ZV before threshold')
         plt.grid(True)    
-        plt.savefig("test_zv/plot_test_1.5e8.png")  
-        #################'''
+        plt.savefig("test_zv/test_zv.png")
+        #################
         if return_zv:
             zv=zv<G
         return zv
