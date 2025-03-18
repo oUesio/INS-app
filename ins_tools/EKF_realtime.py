@@ -184,7 +184,7 @@ class Localizer():
         :param imudata: IMU batch data
         :param W: Window size for batch processing
 
-        :returns: Zero-velocity indicator array where higher values indicate stationary periods
+        :returns: Zero-velocity indicator array where lower values indicate stationary periods
         '''
         # Vector storing test statistics for each window
         T = np.zeros(np.int(np.floor(imudata.shape[0]/W)+1))
@@ -202,7 +202,7 @@ class Localizer():
         # Divides IMU data into non-overlapping windows
         i=0
         for k in range(0,imudata.shape[0]-W+1,W): 
-            # Mean accelertation
+            # Mean acceleration
             smean_a = np.mean(acc[k:k+W,:],axis=0)
             # Loop through each sample in the window and check if stationary
             for s in range(k,k+W):

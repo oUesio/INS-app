@@ -6,6 +6,8 @@ from ins_tools.util import *
 from ins_tools.INS import INS
 import ins_tools.visualize as visualize
 from decimal import Decimal
+import matplotlib.pyplot as plt
+
 
 '''def export_csv(csv_name, data):
     with open(csv_name+'.csv', "w") as outfile:
@@ -70,3 +72,25 @@ def calc_dist(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, 
     #print (x[-1, :3])
     #return np.linalg.norm(x[-1,:3]) # distance between final point and 3D
     return np.linalg.norm(x[-1,:2]) # 2d
+
+def save_topdown(traj, zv, save_dir=None):
+    # Make the same size
+    min_len = min(len(traj), len(zv))
+    traj = traj[:min_len]
+    zv = zv[:min_len]
+    plt.figure()
+
+    traj_true = traj[zv]  # Select points where zv is True
+    plt.scatter(-traj_true[:, 0], traj_true[:, 1], color='red', s=30, label='Estimated ZV')
+
+    plt.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue', label='Trajectory')
+    plt.title('Topdown graph', fontsize=16, color='black')
+    plt.xlabel('x (m)', fontsize=12)
+    plt.ylabel('y (m)', fontsize=12)
+    plt.tick_params(labelsize=12)
+    plt.subplots_adjust(top=0.8)
+    plt.legend(fontsize=10, numpoints=1)
+    plt.grid()
+    plt.axis('square') 
+    if save_dir:
+        plt.savefig(save_dir, dpi=400, bbox_inches='tight')

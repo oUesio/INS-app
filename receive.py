@@ -6,6 +6,7 @@ import os
 from ins_tools.util import *
 import realtime
 from ins_tools.INS_realtime import INS
+import tools
 
 # Callback class to handle live data from the device
 class XdaCallback(xda.XsCallback):
@@ -51,11 +52,6 @@ class XdaCallback(xda.XsCallback):
 
     def getData(self):
         return self.data_list
-    
-    def toggleZV(self):
-        self.m_lock.acquire()
-        self.zv = not self.zv
-        self.m_lock.release()
 
 class Receive:
     def __init__(self):
@@ -63,7 +59,8 @@ class Receive:
         self.running = False
         self.callback = XdaCallback() 
         self.realtime = None
-        self.states = None
+        self.estimates = None
+        self.zv = None
 
     def getStop(self):
         return self.stop
@@ -71,20 +68,19 @@ class Receive:
     def getRunning(self):
         return self.running
 
-    def toggleStop(self):
-        self.stop = not self.stop
+    def setStop(self, state):
+        self.stop = state
 
-    def toggleRunning(self):
-        self.running = not self.running
+    def setRunning(self, state):
+        self.running = state
 
     def getRawData(self):
         return self.callback.data_list
     
-    def getStates(self):
-        return self.states
+    def getEstimates(self):
+        return self.estimates, self.zv
 
     def main(self, trial_type, trial_speed, file_name):
-        self.toggleRunning()
         self.callback = XdaCallback() # Resets callback
         self.realtime = None # resets realtime
         # Default values
@@ -161,21 +157,25 @@ class Receive:
             ####################
 
             # Main loop
+            self.setRunning(True)
             batch_pointer = 0 # keeps track of last processed position
             W = 5 # window size used by zero velocity detector
+            speed = 50 # min increase in size before making estimates
             while not self.stop:
                 current_data_list = np.array(self.callback.data_list)
                 length = len(current_data_list)
-                if length > batch_pointer+100: # controls how often make estimates
+                if length > batch_pointer+speed: # controls how often make estimates
                     init = self.realtime is None
                     batch_size = (((length - batch_pointer) // W) * W) - (not init) # 5n size if initial, 5n - 1 to account for last value of previous batch
+                    print (batch_size)
                     if init:
                         self.realtime = realtime.RealTime(INS(current_data_list[:batch_size], sigma_a = 0.00098, sigma_w = 9.20E-05), W, 2.20E+08) # initial ins
-                    batch_estimates = self.realtime.estimates(current_data_list[batch_pointer-(not init):batch_pointer+batch_size], init) 
-                    # resets states as well if it had values from before
-                    self.states = batch_estimates if init else np.concatenate((self.states, batch_estimates)) # extra first value already removed
+                    batch_estimates, batch_zv = self.realtime.estimates(current_data_list[batch_pointer-(not init):batch_pointer+batch_size], init) 
+                    # resets if it had values from before
+                    self.estimates = batch_estimates if init else np.concatenate((self.estimates, batch_estimates)) # extra first value already removed
+                    self.zv = batch_zv if init else np.concatenate((self.zv, batch_zv))
                     batch_pointer += batch_size
-
+            
             # Stop recording data
             if not device.stopRecording(): 
                 raise RuntimeError("Failed to stop recording. Aborting.")
@@ -183,6 +183,18 @@ class Receive:
             device.removeCallbackHandler(self.callback)
             control.closePort(mt_port.portName())
             control.close()
+
+            name = '_'.join([trial_type,trial_speed,file_name])
+            # Remaining unprocessed data
+            if self.realtime is not None and batch_pointer != 0:
+                current_data_list = np.array(self.callback.data_list)
+                final_estimates, final_zv = self.realtime.estimates(current_data_list[batch_pointer-1:], init) 
+                self.estimates = np.concatenate((self.estimates, final_estimates))
+                self.zv = np.concatenate((self.zv, final_zv))
+
+                # Save final trajectory
+                tools.save_topdown(self.estimates, self.zv, f'results/graphs/{name}.png')
+
 
             ####################
             runtime = (xda.XsTimeStamp_nowMs() - start_time) / 1000
@@ -192,13 +204,18 @@ class Receive:
             print ("Frequency: ", round(length / runtime, 2))
             ####################
 
+            # Save raw data
             with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'),"w", newline="") as file: ####
                 writer = csv.writer(file)
                 writer.writerow(['AccX','AccY','AccZ','GyrX','GyrY','GyrZ'])
                 writer.writerows(self.callback.data_list)
-            print("CSV file created: "+file_name+'.csv')    
+            print("CSV file created: "+file_name+'.csv')   
 
-            self.toggleStop() # Toggle again since toggle was pressed
+            # Save position and velocity estimates and if stationary
+            combined = np.column_stack((self.estimates[:,0:6], self.zv.astype(int)))
+            np.savetxt(f"results/estimates/{name}.csv", combined, delimiter=",", header="x,y,z,vx,vy,vz,zv", comments='', fmt="%.15g,%.15g,%.15g,%.15g,%.15g,%.15g,%d")
+
+            self.setStop(False) # Toggle again since toggle was pressed
         except RuntimeError as error:
             print(error)
             sys.exit(1)
@@ -206,5 +223,5 @@ class Receive:
             print(f"Unexpected error: {e}")
             sys.exit(1)
         finally:
-            self.toggleRunning()  # Ensure running is set to False when the thread ends
+            self.setRunning(False)  # Ensure running is set to False when the thread ends
             print("Receive thread has ended.")
