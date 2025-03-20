@@ -89,16 +89,8 @@ class MainWindow(QMainWindow):
         parse_button = QPushButton("Parse", self)
         parse_button.clicked.connect(self.run_parse)
         parse_layout2.addWidget(parse_button, 0, 0)
-        parse_layout2.setColumnStretch(1, 2)  # 2/3 empty space
+        parse_layout2.setColumnStretch(1, 1)  # 2/3 empty space
         parse_layout2.setColumnStretch(0, 1)  # 1/3 occupied by the button
-
-        debug_button1 = QPushButton("DEBUG count threads", self)
-        debug_button1.clicked.connect(self.active_count)
-        debug_layout.addWidget(debug_button1, 0, 1)
-
-        debug_button2 = QPushButton("DEBUG enum threads", self)
-        debug_button2.clicked.connect(self.enum_threads)
-        debug_layout.addWidget(debug_button2, 0, 3)
 
         controls_layout.addLayout(receive_layout1)
         controls_layout.addLayout(receive_layout2)
@@ -241,13 +233,6 @@ class MainWindow(QMainWindow):
             rec_main = Worker(self.par.plot_data, input1, input2, input3)
             self.threadpool.start(rec_main)
             # plot data in gui
-
-    def active_count(self):
-        print (threading.active_count())
-
-    def enum_threads(self):
-        for thread in threading.enumerate(): 
-            print(thread.name)
 
 app = QApplication([])
 window = MainWindow()

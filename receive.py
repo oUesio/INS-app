@@ -192,8 +192,9 @@ class Receive:
                 self.estimates = np.concatenate((self.estimates, final_estimates))
                 self.zv = np.concatenate((self.zv, final_zv))
 
-                # Save final trajectory
-                tools.save_topdown(self.estimates, self.zv, f'results/graphs/{name}.png')
+                # Save final trajectory graphs
+                tools.save_topdown(self.estimates, self.zv, file_name, f'results/graphs/{name}_topdown.png')
+                tools.save_vertical(self.estimates, self.zv, file_name, f'results/graphs/{name}_vertical.png')
 
 
             ####################
