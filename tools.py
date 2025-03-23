@@ -73,7 +73,7 @@ def calc_dist(det, win, thresh, trial_type, trial_speed, file_name, freq, a, w, 
     #return np.linalg.norm(x[-1,:3]) # distance between final point and 3D
     return np.linalg.norm(x[-1,:2]) # 2d
 
-def save_topdown(traj, zv, name, save_dir):
+def save_topdown(traj, zv, name, speed, save_dir):
     # Make the same size
     min_len = min(len(traj), len(zv))
     traj = traj[:min_len]
@@ -84,7 +84,7 @@ def save_topdown(traj, zv, name, save_dir):
     plt.scatter(-traj_true[:, 0], traj_true[:, 1], color='red', s=30, label='Estimated ZV')
 
     plt.plot(-traj[:,0], traj[:,1], linewidth = 1.7, color='blue', label='Trajectory')
-    plt.title(f'{name} Topdown graph', fontsize=16, color='black')
+    plt.title(f'Topdown graph: {speed} {name}', fontsize=16, color='black')
     plt.xlabel('x (m)', fontsize=12)
     plt.ylabel('y (m)', fontsize=12)
     plt.tick_params(labelsize=12)
@@ -94,27 +94,21 @@ def save_topdown(traj, zv, name, save_dir):
     plt.axis('square') 
     plt.savefig(save_dir, dpi=400, bbox_inches='tight')
 
-def save_vertical(traj, zv, name, save_dir, T=1.0/100):
+def save_vertical(traj, zv, name, speed, save_dir, T=1.0/100):
     min_len = min(len(traj), len(zv))
     traj = traj[:min_len]
     zv = zv[:min_len]
     plt.figure()
 
     num_points = traj.shape[0]
-    try:
-        time_values = np.arange(0, num_points * T, T)[:-1] 
-        print ('TEST A')
-        plt.plot(time_values, traj[:,2], linewidth = 1, color='blue', label='Trajectory')
-    except:
-        time_values = np.arange(0, num_points * T, T)
-        print ('TEST B')
-        plt.plot(time_values, traj[:,2], linewidth = 1, color='blue', label='Trajectory')
+    time_values = np.arange(0, num_points * T, T)[:num_points]
+    plt.plot(time_values, traj[:,2], linewidth = 1, color='blue', label='Trajectory')
  
     time_zv = time_values[zv]
     traj_zv = traj[zv, 2]
     plt.scatter(time_zv, traj_zv, color='red', s=30, label='Estimated ZV')
 
-    plt.title(f'{name} Vertical graph', fontsize=16, color='black')
+    plt.title(f'Vertical graph: {speed} {name}', fontsize=16, color='black')
     plt.xlabel('Time (s)', fontsize=12)
     plt.ylabel('z (m)', fontsize=12)
     plt.tick_params(labelsize=12)

@@ -90,6 +90,10 @@ class Receive:
             trial_speed = "walk"
         if not file_name:
             file_name = "exportfile"
+        if trial_type not in ['hallway', 'stairs']:
+            raise RuntimeError("Invalid trial type (hallway, stairs). Aborting.")
+        if trial_type == 'hallway' and trial_speed not in ['walk', 'run']:
+            raise RuntimeError("Invalid trial speed for hallway (walk, run). Aborting.")
 
         # Create XsControl object
         control = xda.XsControl_construct()
@@ -184,7 +188,11 @@ class Receive:
             control.closePort(mt_port.portName())
             control.close()
 
-            name = '_'.join([trial_type,trial_speed,file_name])
+            if trial_type == 'stairs':
+                trial_speed = 'stairs'
+                name = '_'.join([trial_type,file_name])
+            else:
+                name = '_'.join([trial_type,trial_speed,file_name])
             # Remaining unprocessed data
             if self.realtime is not None and batch_pointer != 0:
                 current_data_list = np.array(self.callback.data_list)
@@ -193,9 +201,8 @@ class Receive:
                 self.zv = np.concatenate((self.zv, final_zv))
 
                 # Save final trajectory graphs
-                tools.save_topdown(self.estimates, self.zv, file_name, f'results/graphs/{name}_topdown.png')
-                tools.save_vertical(self.estimates, self.zv, file_name, f'results/graphs/{name}_vertical.png')
-
+                tools.save_topdown(self.estimates, self.zv, file_name, trial_speed, f'results/graphs/{name}_topdown.png')
+                tools.save_vertical(self.estimates, self.zv, file_name, trial_speed, f'results/graphs/{name}_vertical.png')
 
             ####################
             runtime = (xda.XsTimeStamp_nowMs() - start_time) / 1000
@@ -205,7 +212,7 @@ class Receive:
             print ("Frequency: ", round(length / runtime, 2))
             ####################
 
-            # Save raw data
+            # Save raw data                
             with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'),"w", newline="") as file: ####
                 writer = csv.writer(file)
                 writer.writerow(['AccX','AccY','AccZ','GyrX','GyrY','GyrZ'])
