@@ -99,16 +99,13 @@ class Receive:
         control = xda.XsControl_construct()
         assert(control != 0)
 
-        ####################
         xda_version = xda.XsVersion()
         xda.xdaVersion(xda_version)
         print("Using XDA version %s" % xda_version.toXsString())
-        ####################
 
         try:
             # Scan for connected Xsens devices
             port_info_array =  xda.XsScanner_scanPorts() 
-            print (port_info_array)
             # Find an MTi device
             mt_port = xda.XsPortInfo()
             for i in range(port_info_array.size()):
@@ -118,22 +115,18 @@ class Receive:
             if mt_port.empty():
                 raise RuntimeError("No MTi device found. Aborting.")
 
-            ####################
             # Display device details
             did = mt_port.deviceId()
             print(" Device ID: %s" % did.toXsString())
             print(" Port name: %s" % mt_port.portName())
-            ####################
 
             if not control.openPort(mt_port.portName(), mt_port.baudrate()):
                 raise RuntimeError("Could not open port. Aborting.")
 
-            ####################
             # Get the device object
             device = control.device(did)
             assert(device != 0)
             print("Device: %s, with ID: %s opened." % (device.productCode(), device.deviceId().toXsString()))
-            ####################
 
             # Create and attach callback handler to device
             device.addCallbackHandler(self.callback)
@@ -156,29 +149,33 @@ class Receive:
                 raise RuntimeError("Could not put device into measurement mode. Aborting.")
             if not device.startRecording(): 
                 raise RuntimeError("Failed to start recording. Aborting.")
-            ####################
             start_time = xda.XsTimeStamp_nowMs()
-            ####################
 
             # Main loop
             self.setRunning(True)
             batch_pointer = 0 # keeps track of last processed position
             W = 5 # window size used by zero velocity detector
-            speed = 50 # min increase in size before making estimates
+            speed = 5 # min increase in size before making estimates, has to be >= W
             while not self.stop:
                 current_data_list = np.array(self.callback.data_list)
                 length = len(current_data_list)
-                if length > batch_pointer+speed: # controls how often make estimates
-                    init = self.realtime is None
-                    batch_size = (((length - batch_pointer) // W) * W) - (not init) # 5n size if initial, 5n - 1 to account for last value of previous batch
-                    print (batch_size)
-                    if init:
-                        self.realtime = realtime.RealTime(INS(current_data_list[:batch_size], sigma_a = 0.00098, sigma_w = 9.20E-05), W, 2.20E+08) # initial ins
-                    batch_estimates, batch_zv = self.realtime.estimates(current_data_list[batch_pointer-(not init):batch_pointer+batch_size], init) 
-                    # resets if it had values from before
-                    self.estimates = batch_estimates if init else np.concatenate((self.estimates, batch_estimates)) # extra first value already removed
-                    self.zv = batch_zv if init else np.concatenate((self.zv, batch_zv))
-                    batch_pointer += batch_size
+                init = self.realtime is None
+                if init:
+                    if length >= 20:
+                        self.realtime = realtime.RealTime(INS(current_data_list[:20], sigma_a = 0.00098, sigma_w = 9.20E-05), W, 2.20E+08) # initial ins
+                        batch_estimates, batch_zv = self.realtime.estimates(current_data_list[:20], init) 
+                        print ('init: 20')
+                        self.estimates = batch_estimates
+                        self.zv = batch_zv
+                        batch_pointer = 20
+                else:
+                    if length > batch_pointer+speed: # controls how often make estimates
+                        batch_size = (((length - batch_pointer) // W) * W) - 1 # 5n - 1 to account for last value of previous batch
+                        batch_estimates, batch_zv = self.realtime.estimates(current_data_list[batch_pointer-1:batch_pointer+batch_size], init) 
+                        print (batch_size)
+                        self.estimates = np.concatenate((self.estimates, batch_estimates)) # extra first value already removed
+                        self.zv = np.concatenate((self.zv, batch_zv))
+                        batch_pointer += batch_size
             
             # Stop recording data
             if not device.stopRecording(): 
@@ -188,8 +185,14 @@ class Receive:
             control.closePort(mt_port.portName())
             control.close()
 
+            runtime = (xda.XsTimeStamp_nowMs() - start_time) / 1000
+            length = self.callback.getLengthData()
+            print ("Time: %s seconds" % runtime)
+            print ("Datapoints: ", length)
+
             if trial_type == 'stairs':
                 trial_speed = 'stairs'
+                trial_type = ''
                 name = '_'.join([trial_type,file_name])
             else:
                 name = '_'.join([trial_type,trial_speed,file_name])
@@ -203,25 +206,21 @@ class Receive:
                 # Save final trajectory graphs
                 tools.save_topdown(self.estimates, self.zv, file_name, trial_speed, f'results/graphs/{name}_topdown.png')
                 tools.save_vertical(self.estimates, self.zv, file_name, trial_speed, f'results/graphs/{name}_vertical.png')
+                print("Topdown graph image created at: "+f'results/graphs/{name}_topdown.png')   
+                print("Vertical graph image created at: "+f'results/graphs/{name}_vertical.png')   
 
-            ####################
-            runtime = (xda.XsTimeStamp_nowMs() - start_time) / 1000
-            length = self.callback.getLengthData()
-            print ("Time: %s seconds" % runtime)
-            print ("Datapoints: ", length)
-            print ("Frequency: ", round(length / runtime, 2))
-            ####################
-
-            # Save raw data                
-            with open(os.path.join('data',trial_type,trial_speed,file_name+'.csv'),"w", newline="") as file: ####
+            # Save raw data        
+            path = os.path.join('data',trial_type,trial_speed,file_name+'.csv')        
+            with open(path,"w", newline="") as file: ####
                 writer = csv.writer(file)
                 writer.writerow(['AccX','AccY','AccZ','GyrX','GyrY','GyrZ'])
                 writer.writerows(self.callback.data_list)
-            print("CSV file created: "+file_name+'.csv')   
+            print("Raw data CSV file created at: "+path)   
 
             # Save position and velocity estimates and if stationary
             combined = np.column_stack((self.estimates[:,0:6], self.zv.astype(int)))
             np.savetxt(f"results/estimates/{name}.csv", combined, delimiter=",", header="x,y,z,vx,vy,vz,zv", comments='', fmt="%.15g,%.15g,%.15g,%.15g,%.15g,%.15g,%d")
+            print("Estimates CSV file created at: "+f"results/estimates/{name}.csv") 
 
             self.setStop(False) # Toggle again since toggle was pressed
         except RuntimeError as error:
@@ -232,4 +231,3 @@ class Receive:
             sys.exit(1)
         finally:
             self.setRunning(False)  # Ensure running is set to False when the thread ends
-            print("Receive thread has ended.")
