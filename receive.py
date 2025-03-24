@@ -92,8 +92,8 @@ class Receive:
             file_name = "exportfile"
         if trial_type not in ['hallway', 'stairs']:
             raise RuntimeError("Invalid trial type (hallway, stairs). Aborting.")
-        if trial_type == 'hallway' and trial_speed not in ['walk', 'run']:
-            raise RuntimeError("Invalid trial speed for hallway (walk, run). Aborting.")
+        if trial_type == 'hallway' and trial_speed not in ['walk', 'run', 'mixed']:
+            raise RuntimeError("Invalid trial speed for hallway (walk, run, mixed). Aborting.")
 
         # Create XsControl object
         control = xda.XsControl_construct()
@@ -193,7 +193,7 @@ class Receive:
             if trial_type == 'stairs':
                 trial_speed = 'stairs'
                 trial_type = ''
-                name = '_'.join([trial_type,file_name])
+                name = '_'.join(['stairs',file_name])
             else:
                 name = '_'.join([trial_type,trial_speed,file_name])
             # Remaining unprocessed data

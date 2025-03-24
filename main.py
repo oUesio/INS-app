@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QHBoxLayout,
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from receive import Receive
-from parse import Parse
 import numpy as np
 import matplotlib
 import warnings
@@ -34,7 +33,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.rec = Receive()
-        self.par = Parse()
         self.threadpool = QThreadPool()
         self.threadpool.setMaxThreadCount(10)
         self.imudata = np.zeros((250, 6))  # Initialize with empty data
@@ -56,8 +54,6 @@ class MainWindow(QMainWindow):
         controls_layout = QVBoxLayout()
         receive_layout1 = QGridLayout()
         receive_layout2 = QGridLayout()
-        parse_layout1 = QGridLayout()
-        parse_layout2 = QGridLayout()
         debug_layout = QGridLayout()
 
         receive_layout1.addWidget(QLabel("Enter trial type (Default: hallway):"), 0, 0)
@@ -77,26 +73,8 @@ class MainWindow(QMainWindow):
         receive_button2.clicked.connect(self.stop_receive)
         receive_layout2.addWidget(receive_button2, 0, 1)
 
-        parse_layout1.addWidget(QLabel("Enter trial type (Default: hallway):"), 0, 0)
-        self.parse_input1 = QLineEdit(self)
-        parse_layout1.addWidget(self.parse_input1, 0, 2)
-        parse_layout1.addWidget(QLabel("Enter trial speed (Default: walk):"), 1, 0)
-        self.parse_input2 = QLineEdit(self)
-        parse_layout1.addWidget(self.parse_input2, 1, 2)
-        parse_layout1.addWidget(QLabel("Enter CSV file name (Default: exportfile):"), 2, 0)
-        self.parse_input3 = QLineEdit(self)
-        parse_layout1.addWidget(self.parse_input3, 2, 2)
-
-        parse_button = QPushButton("Parse", self)
-        parse_button.clicked.connect(self.run_parse)
-        parse_layout2.addWidget(parse_button, 0, 0)
-        parse_layout2.setColumnStretch(1, 1)  # 2/3 empty space
-        parse_layout2.setColumnStretch(0, 1)  # 1/3 occupied by the button
-
         controls_layout.addLayout(receive_layout1)
         controls_layout.addLayout(receive_layout2)
-        controls_layout.addLayout(parse_layout1)
-        controls_layout.addLayout(parse_layout2)
         controls_layout.addLayout(debug_layout)
 
         # Plot
@@ -218,7 +196,7 @@ class MainWindow(QMainWindow):
 
     def start_receive(self):
         try:
-            if not self.rec.getRunning() and not self.par.getRunning():
+            if not self.rec.getRunning():
                 self.imudata = np.zeros((250, 6))
                 self.estimates = None
                 self.zv = None
@@ -246,15 +224,6 @@ class MainWindow(QMainWindow):
                 print ("\nStopped running")
         except Exception as e:
             print(f"Unexpected error (stop_receive): {e}")
-
-    def run_parse(self):
-        if not self.rec.getRunning() and not self.par.getRunning():
-            input1 = self.receive_input1.text()
-            input2 = self.receive_input2.text()
-            input3 = self.receive_input3.text()
-            rec_main = Worker(self.par.plot_data, input1, input2, input3)
-            self.threadpool.start(rec_main)
-            # plot data in gui
 
 app = QApplication([])
 window = MainWindow()
