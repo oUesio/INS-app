@@ -1,5 +1,4 @@
 import numpy as np
-from ins_tools.util import *
 from ins_tools.EKF_realtime import Localizer
 
 class INS():

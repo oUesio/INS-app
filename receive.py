@@ -3,8 +3,6 @@ import numpy as np
 import xsensdeviceapi as xda
 from threading import Lock
 import os
-from ins_tools.util import *
-import realtime
 from ins_tools.INS_realtime import INS
 import tools
 
@@ -58,7 +56,7 @@ class Receive:
         self.stop = False
         self.running = False
         self.callback = XdaCallback() 
-        self.realtime = None
+        self.ins = None
         self.estimates = None
         self.zv = None
 
@@ -79,10 +77,17 @@ class Receive:
     
     def getEstimates(self):
         return self.estimates, self.zv
+    
+    def processData(self, imubatch, W, threshold, init):
+        zv = self.ins.Localizer.compute_zv_lrt(imudata=imubatch, W=W, G=threshold)
+        estimates = self.ins.baseline(imudata=imubatch, zv=zv, init=init)
+
+        self.estimates = estimates if init else np.concatenate((self.estimates, estimates[1:]))
+        self.zv = zv if init else np.concatenate((self.zv, zv[1:]))
 
     def main(self, trial_type, trial_speed, file_name):
         self.callback = XdaCallback() # Resets callback
-        self.realtime = None # resets realtime
+        self.ins = None # resets ins
         # Default values
         if not trial_type:
             trial_type = "hallway"
@@ -156,25 +161,20 @@ class Receive:
             batch_pointer = 0 # keeps track of last processed position
             W = 5 # window size used by zero velocity detector
             speed = 5 # min increase in size before making estimates, has to be >= W
+            threshold = 2.20E+08 # Threshold for the ZVD
             while not self.stop:
                 current_data_list = np.array(self.callback.data_list)
                 length = len(current_data_list)
-                init = self.realtime is None
+                init = self.ins is None
                 if init:
                     if length >= 20:
-                        self.realtime = realtime.RealTime(INS(current_data_list[:20], sigma_a = 0.00098, sigma_w = 9.20E-05), W, 2.20E+08) # initial ins
-                        batch_estimates, batch_zv = self.realtime.estimates(current_data_list[:20], init) 
-                        print ('init: 20')
-                        self.estimates = batch_estimates
-                        self.zv = batch_zv
+                        self.ins = INS(current_data_list[:20], sigma_a = 0.00098, sigma_w = 9.20E-05) # initial ins
+                        self.processData(current_data_list[:20], W, threshold, init)
                         batch_pointer = 20
                 else:
                     if length > batch_pointer+speed: # controls how often make estimates
                         batch_size = (((length - batch_pointer) // W) * W) - 1 # 5n - 1 to account for last value of previous batch
-                        batch_estimates, batch_zv = self.realtime.estimates(current_data_list[batch_pointer-1:batch_pointer+batch_size], init) 
-                        print (batch_size)
-                        self.estimates = np.concatenate((self.estimates, batch_estimates)) # extra first value already removed
-                        self.zv = np.concatenate((self.zv, batch_zv))
+                        self.processData(current_data_list[batch_pointer-1:batch_pointer+batch_size], W, threshold, init)
                         batch_pointer += batch_size
             
             # Stop recording data
@@ -197,11 +197,9 @@ class Receive:
             else:
                 name = '_'.join([trial_type,trial_speed,file_name])
             # Remaining unprocessed data
-            if self.realtime is not None and batch_pointer != 0:
+            if self.ins is not None and batch_pointer != 0:
                 current_data_list = np.array(self.callback.data_list)
-                final_estimates, final_zv = self.realtime.estimates(current_data_list[batch_pointer-1:], init) 
-                self.estimates = np.concatenate((self.estimates, final_estimates))
-                self.zv = np.concatenate((self.zv, final_zv))
+                self.processData(current_data_list[batch_pointer-1:], W, threshold, False)
 
                 # Save final trajectory graphs
                 tools.save_topdown(self.estimates, self.zv, file_name, trial_speed, f'results/graphs/{name}_topdown.png')
@@ -211,10 +209,7 @@ class Receive:
 
             # Save raw data        
             path = os.path.join('data',trial_type,trial_speed,file_name+'.csv')        
-            with open(path,"w", newline="") as file: ####
-                writer = csv.writer(file)
-                writer.writerow(['AccX','AccY','AccZ','GyrX','GyrY','GyrZ'])
-                writer.writerows(self.callback.data_list)
+            np.savetxt(path, self.callback.data_list, delimiter=",", header="AccX,AccY,AccZ,GyrX,GyrY,GyrZ", comments='')
             print("Raw data CSV file created at: "+path)   
 
             # Save position and velocity estimates and if stationary

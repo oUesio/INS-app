@@ -1,6 +1,5 @@
 import numpy as np
 from numpy import linalg as LA
-from ins_tools.util import *
 from ins_tools.geometry_helpers import quat2mat, mat2quat, euler2quat, quat2euler
 import sys
 sys.path.append('../')
