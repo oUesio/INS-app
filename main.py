@@ -43,11 +43,11 @@ class MainWindow(QMainWindow):
 
         # Updates the plots
         self.update_timer = QTimer(self)
-        self.update_timer.timeout.connect(self.update_data)
+        self.update_timer.timeout.connect(self.updateData)
 
         # Polling the receive running status
         self.check_running_timer = QTimer(self)
-        self.check_running_timer.timeout.connect(self.check_rec_running)
+        self.check_running_timer.timeout.connect(self.checkRecRunning)
 
         # Buttons and LineEdits
         window1_layout = QHBoxLayout()
@@ -67,10 +67,10 @@ class MainWindow(QMainWindow):
         receive_layout1.addWidget(self.receive_input3, 2, 2)
 
         receive_button1 = QPushButton("Start Receive")
-        receive_button1.clicked.connect(self.start_receive)
+        receive_button1.clicked.connect(self.startReceive)
         receive_layout2.addWidget(receive_button1, 0, 0)
         receive_button2 = QPushButton("Stop Receive")
-        receive_button2.clicked.connect(self.stop_receive)
+        receive_button2.clicked.connect(self.stopReceive)
         receive_layout2.addWidget(receive_button2, 0, 1)
 
         controls_layout.addLayout(receive_layout1)
@@ -106,9 +106,9 @@ class MainWindow(QMainWindow):
         full_window.setLayout(full_window_layout)
 
         self.setCentralWidget(full_window)
-        self.init_plots()
+        self.initPlots()
 
-    def init_plots(self):
+    def initPlots(self):
         try:
             self.canvas1.axes.set_title("Linear Acceleration")
             self.canvas1.axes.set_ylabel("Acceleration (Gs)")
@@ -136,9 +136,9 @@ class MainWindow(QMainWindow):
             self.canvas3.axes.grid()
             self.canvas3.fig.subplots_adjust(bottom=0.18, left=0.15, top=1)
         except Exception as e:
-            print(f"Unexpected error (init_plots): {e}")
+            print(f"Unexpected error (initPlots): {e}")
 
-    def update_raw_plot(self):
+    def updateRawPlots(self):
         try:
             data = self.imudata[-250:]
             indices = np.arange(len(self.imudata))[-250:]
@@ -161,9 +161,9 @@ class MainWindow(QMainWindow):
                 self.canvas2.axes.autoscale_view()
                 self.canvas2.draw()
         except Exception as e:
-            print(f"Unexpected error (update_raw_plot): {e}")
+            print(f"Unexpected error (updateRawPlots): {e}")
 
-    def update_position_plot(self):
+    def updatePositionPlot(self):
         try:
             if self.estimates is not None and self.zv is not None and len(self.estimates) == len(self.zv):
                 traj = self.estimates
@@ -178,23 +178,23 @@ class MainWindow(QMainWindow):
                 self.canvas3.axes.set_aspect('equal', adjustable='datalim')
                 self.canvas3.draw()
         except Exception as e:
-            print(f"Unexpected error (update_position_plot): {e}")
+            print(f"Unexpected error (updatePositionPlot): {e}")
 
-    def update_data(self):
+    def updateData(self):
         try:
             if self.rec.getRunning():
                 data_list = self.rec.getRawData()
                 estimates, zv = self.rec.getEstimates()
                 if estimates is not None and zv is not None:
                     self.estimates, self.zv = estimates, zv
-                    self.update_position_plot()
+                    self.updatePositionPlot()
                 if data_list: # Empty list
                     self.imudata = np.array(data_list)
-                    self.update_raw_plot()
+                    self.updateRawPlots()
         except Exception as e:
-            print(f"Unexpected error (update_data): {e}")
+            print(f"Unexpected error (updateData): {e}")
 
-    def start_receive(self):
+    def startReceive(self):
         try:
             if not self.rec.getRunning():
                 self.imudata = np.zeros((250, 6))
@@ -207,15 +207,18 @@ class MainWindow(QMainWindow):
                 self.threadpool.start(rec_main)
                 self.check_running_timer.start(100)
         except Exception as e:
-            print(f"Unexpected error (start_receive): {e}")
+            print(f"Unexpected error (startReceive): {e}")
 
-    def check_rec_running(self):
-        if self.rec.getRunning():
-            self.check_running_timer.stop()
-            # Waits for receive to start before starting while loop
-            self.update_timer.start(20)
+    def checkRecRunning(self):
+        try:
+            if self.rec.getRunning():
+                self.check_running_timer.stop()
+                # Waits for receive to start before starting while loop
+                self.update_timer.start(20)
+        except Exception as e:
+            print(f"Unexpected error (checkRecRunning): {e}")
 
-    def stop_receive(self):
+    def stopReceive(self):
         try:
             # Only runs if receive is running
             if self.rec.getRunning():
@@ -223,7 +226,7 @@ class MainWindow(QMainWindow):
                 self.update_timer.stop()
                 print ("\nStopped running")
         except Exception as e:
-            print(f"Unexpected error (stop_receive): {e}")
+            print(f"Unexpected error (stopReceive): {e}")
 
 app = QApplication([])
 window = MainWindow()

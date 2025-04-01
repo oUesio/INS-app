@@ -1,13 +1,5 @@
 import numpy as np
-import csv
 import matplotlib.pyplot as plt
-
-def read_imu_csv(csv_file):
-    with open(csv_file, mode="r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        imu = np.array([list(map(float, row)) for row in reader], dtype=float) 
-        return imu
 
 def save_topdown(traj, zv, name, speed, save_dir):
     # Make the same size

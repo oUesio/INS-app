@@ -1,7 +1,5 @@
 import numpy as np
-import pandas as pd
 import os
-import tools
 from ins_tools.INS_realtime import INS
 import math
 
@@ -17,10 +15,10 @@ total = {'walk':[], 'run':[], 'mixed':[], '1F':[], '2F':[], '3F':[]}
 for filename in sorted(os.listdir(estimates)):
     if ("walk_trial" in filename or "run_trial" in filename or "mixed_trial" in filename) and filename.endswith(".csv"): 
         file_path = os.path.join(estimates, filename)
-        df = pd.read_csv(file_path)
+        data = np.loadtxt(file_path, delimiter=",", skiprows=1)
         
         # XY Plane
-        last_values = df.iloc[-1, :2].values
+        last_values = data[-1, :2]
         if "walk_trial" in filename:
             total['walk'].append(calc_dist(last_values))
         elif "run_trial" in filename:
@@ -28,14 +26,14 @@ for filename in sorted(os.listdir(estimates)):
         else:
             total['mixed'].append(calc_dist(last_values))
         
-        print(f"File: {filename}, XY distance: {calc_dist(last_values)}")
+        #print(f"File: {filename}, XY distance: {calc_dist(last_values)}")
 
     if ("stairs_trial" in filename) and filename.endswith(".csv"):
         file_path = os.path.join(estimates, filename)
-        df = pd.read_csv(file_path)
+        data = np.loadtxt(file_path, delimiter=",", skiprows=1)
         
         # XYZ Space
-        last_values = df.iloc[-1, :3].values
+        last_values = data[-1, :3]
         if "1F" in filename:
             total['1F'].append(calc_dist(last_values))
         elif "2F" in filename:
@@ -43,7 +41,7 @@ for filename in sorted(os.listdir(estimates)):
         else:
             total['3F'].append(calc_dist(last_values))
         
-        print(f"File: {filename}, XYZ distance: {calc_dist(last_values)}")
+        #print(f"File: {filename}, XYZ distance: {calc_dist(last_values)}")
 
 print (total)
 for x in total:
@@ -54,8 +52,7 @@ for x in total:
 
 # Full Data
 def full_estimates(trial_type, trial_speed, file_name):
-    imu = tools.read_imu_csv(os.path.join('data',trial_type,trial_speed,file_name))
-
+    imu = np.loadtxt(os.path.join('data',trial_type,trial_speed,file_name), delimiter=",", skiprows=1)
     ins = INS(imu, sigma_a = 0.00098, sigma_w = 9.20E-05)
     zv = ins.Localizer.compute_zv_lrt(imu, W=5, G=2.20E+08)
     x = ins.baseline(imudata=imu, zv=zv, init=True)
