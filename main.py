@@ -6,6 +6,9 @@ from receive import Receive
 import warnings
 warnings.simplefilter("ignore", UserWarning)
 
+import time
+import matplotlib.pyplot as plt
+
 pg.setConfigOption('background', 'white')
 
 class CustomPlotWidget(pg.PlotWidget):
@@ -13,9 +16,9 @@ class CustomPlotWidget(pg.PlotWidget):
         super().__init__(*args, **kwargs)
 
         # Set axis colors to black
-        self.getAxis('left').setPen(pg.mkPen('black'))    # Y-axis line
-        self.getAxis('bottom').setPen(pg.mkPen('black'))  # X-axis line
-        self.getAxis('left').setTextPen(pg.mkPen('black'))  # Y-axis labels
+        self.getAxis('left').setPen(pg.mkPen('black'))   
+        self.getAxis('bottom').setPen(pg.mkPen('black'))  
+        self.getAxis('left').setTextPen(pg.mkPen('black'))  
         self.getAxis('bottom').setTextPen(pg.mkPen('black'))  
         self.setFixedSize(460, 310)
         self.setTitle(f"<span style='color: black; font-size: 12pt;'>{title}</span>")
@@ -40,16 +43,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.rec = Receive()
-        self.threadpool = QThreadPool()
-        self.imudata = None
-        self.estimates = None
-        self.zv = None
+        self.threadpool = QThreadPool() 
+
+        #self.call_counts = [] # Testing graph updates
+        #self.start_time = int(time.time())
+
         self.setFixedSize(QSize(1050, 700))
         self.setWindowTitle("Realtime Foot-mounted INS")
-
-        # Polling the receive running status
-        self.check_running_timer = QTimer(self)
-        self.check_running_timer.timeout.connect(self.checkRecRunning)
 
         # Updates the plots
         self.update_timer = QTimer(self)
@@ -132,29 +132,26 @@ class MainWindow(QMainWindow):
         full_window.setLayout(full_window_layout)
         self.setCentralWidget(full_window)
 
-    def updateRawPlots(self):
+    def updateRawPlots(self, imudata):
         try:
-            if self.imudata is not None:
-                data = self.imudata[-250:]
-                indices = np.arange(len(self.imudata))[-250:]
-                
-                if data.shape[0] > 0:
-                    self.line1.setData(indices, data[:, 0] / 9.8)
-                    self.line2.setData(indices, data[:, 1] / 9.8)
-                    self.line3.setData(indices, data[:, 2] / 9.8)
-                    self.line4.setData(indices, data[:, 3] / 180 / np.pi)
-                    self.line5.setData(indices, data[:, 4] / 180 / np.pi)
-                    self.line6.setData(indices, data[:, 5] / 180 / np.pi)
+            data = imudata[-250:]
+            indices = np.arange(len(imudata))[-250:]
+            
+            if data.shape[0] > 0:
+                self.line1.setData(indices, data[:, 0] / 9.8)
+                self.line2.setData(indices, data[:, 1] / 9.8)
+                self.line3.setData(indices, data[:, 2] / 9.8)
+                self.line4.setData(indices, data[:, 3] / 180 / np.pi)
+                self.line5.setData(indices, data[:, 4] / 180 / np.pi)
+                self.line6.setData(indices, data[:, 5] / 180 / np.pi)
         except Exception as e:
             print(f"Unexpected error (updateRawPlots): {e}")
 
-    def updatePositionPlot(self):
+    def updatePositionPlot(self, estimates, zv):
         try:
-            if self.estimates is not None and self.zv is not None:
-                traj = self.estimates
-                traj_true = traj[self.zv]
-                self.scatter_plot.setData(-traj_true[:, 0], traj_true[:, 1], pen=pg.mkPen(width=3, color='r'), symbol='o', name="Estimated ZV")
-                self.traj_plot.setData(-traj[:, 0], traj[:, 1])
+            traj_true = estimates[zv]
+            self.scatter_plot.setData(-traj_true[:, 0], traj_true[:, 1], pen=pg.mkPen(width=3, color='r'), symbol='o', name="Estimated ZV")
+            self.traj_plot.setData(-estimates[:, 0], estimates[:, 1])
         except Exception as e:
             print(f"Unexpected error (updatePositionPlot): {e}")
 
@@ -164,37 +161,34 @@ class MainWindow(QMainWindow):
                 data_list = self.rec.getRawData()
                 estimates, zv = self.rec.getEstimates()
                 if estimates is not None and zv is not None:
-                    self.estimates, self.zv = estimates, zv
-                    self.updatePositionPlot()
+
+                    #current_time = int(time.time()) - self.start_time # Testing graph updates
+                    #while len(self.call_counts) <= current_time:
+                    #    self.call_counts.append(0)
+                    #self.call_counts[current_time] += 1
+
+                    # Make the same size
+                    min_len = min(len(estimates), len(zv))
+                    estimates = estimates[:min_len]
+                    zv = zv[:min_len]
+                    self.updatePositionPlot(estimates, zv)
                 if data_list: # Empty list
-                    self.imudata = np.array(data_list)
-                    self.updateRawPlots()
+                    self.updateRawPlots(np.array(data_list))
         except Exception as e:
             print(f"Unexpected error (updateData): {e}")
 
     def startReceive(self):
         try:
             if not self.rec.getRunning():
-                self.imudata = None
-                self.estimates = None
-                self.zv = None
+                self.rec.setRunning(True)
                 input1 = self.receive_input1.text()
                 input2 = self.receive_input2.text()
                 input3 = self.receive_input3.text()
                 rec_main = Worker(self.rec.main, input1, input2, input3)
                 self.threadpool.start(rec_main)
-                self.check_running_timer.start(100)
-        except Exception as e:
-            print(f"Unexpected error (startReceive): {e}")
-
-    def checkRecRunning(self):
-        try:
-            if self.rec.getRunning():
-                self.check_running_timer.stop()
-                # Waits for receive to start before starting while loop
                 self.update_timer.start(20)
         except Exception as e:
-            print(f"Unexpected error (checkRecRunning): {e}")
+            print(f"Unexpected error (startReceive): {e}")
 
     def stopReceive(self):
         try:
@@ -203,6 +197,13 @@ class MainWindow(QMainWindow):
                 self.rec.setStop(True)
                 self.update_timer.stop()
                 print ("\nStopped running")
+
+                #plt.figure(figsize=(16, 4)) # Testing graph updates
+                #plt.plot(self.call_counts, linestyle='-', color='m')
+                #plt.xlabel('Seconds')
+                #plt.ylabel('Graph Updates')
+                #plt.grid()
+                #plt.savefig('update_rate.png', dpi=400, bbox_inches='tight')   
         except Exception as e:
             print(f"Unexpected error (stopReceive): {e}")
 

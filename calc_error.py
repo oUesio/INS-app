@@ -48,7 +48,7 @@ for x in total:
     mean = sum(total[x]) / 9
     print (x + ' position error: ' + str(round(mean,4)) + 'm')
     print (x + ' relative error: ' + str(round((mean/dists[x])*100, 4)) + '%')
-    print (x + ' sd: ' + str(math.sqrt(sum((x - mean) ** 2 for x in total[x]) / (len(total[x]) - 1))) + '%')
+    print (x + ' sd: ' + str(round(math.sqrt(sum((val - mean) ** 2 for val in total[x]) / (len(total[x]) - 1)),4)))
 
 # Full Data
 def full_estimates(trial_type, trial_speed, file_name):
@@ -83,3 +83,5 @@ for x in total_full:
     mean = sum(total_full[x]) / 9
     print (x + ' full position error: ' + str(round(mean,4)) + 'm')
     print (x + ' full relative error: ' + str(round((mean/dists[x])*100, 4)) + '%')
+    print (x + ' sd: ' + str(round(math.sqrt(sum((val - mean) ** 2 for val in total[x]) / (len(total[x]) - 1)),4)))
+

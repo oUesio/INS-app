@@ -8,27 +8,10 @@ import tools
 
 # Callback class to handle live data from the device
 class XdaCallback(xda.XsCallback):
-    def __init__(self, max_buffer_size = 5):
+    def __init__(self):
         xda.XsCallback.__init__(self)
-        self.m_maxNumberOfPacketsInBuffer = max_buffer_size # Max buffer size for storing packets
-        self.m_packetBuffer = list() # Buffer to store data packets
         self.m_lock = Lock() # Thread lock
         self.data_list = [] 
-
-    def packetAvailable(self):
-        # Check if there are packets available in the buffer
-        self.m_lock.acquire()
-        res = len(self.m_packetBuffer) > 0 # Return True if buffer is not empty
-        self.m_lock.release()
-        return res
-
-    def getNextPacket(self):
-        # Retrieve the oldest packet from the buffer
-        self.m_lock.acquire()
-        assert(len(self.m_packetBuffer) > 0)
-        oldest_packet = xda.XsDataPacket(self.m_packetBuffer.pop(0)) # Remove and return the oldest packet
-        self.m_lock.release()
-        return oldest_packet
 
     def onLiveDataAvailable(self, dev, packet):
         # Handle live data packets as they become available
@@ -40,9 +23,6 @@ class XdaCallback(xda.XsCallback):
         data = list(acc)+list(gyr)
         self.data_list.append(data) 
 
-        while len(self.m_packetBuffer) >= self.m_maxNumberOfPacketsInBuffer:
-            self.m_packetBuffer.pop() # Remove the oldest packet if buffer is full
-        self.m_packetBuffer.append(xda.XsDataPacket(packet)) # Add the new packet to the buffer
         self.m_lock.release()
 
     def getLengthData(self):
@@ -73,7 +53,7 @@ class Receive:
         self.running = state
 
     def getRawData(self):
-        return self.callback.data_list
+        return self.callback.getData()
     
     def getEstimates(self):
         return self.estimates, self.zv
@@ -146,7 +126,7 @@ class Receive:
             config_array.push_back(xda.XsOutputConfiguration(xda.XDI_SampleTimeFine, 0))
             # Add IMU configurations
             config_array.push_back(xda.XsOutputConfiguration(xda.XDI_Acceleration, 100))
-            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_RateOfTurn, 100)) # ???
+            config_array.push_back(xda.XsOutputConfiguration(xda.XDI_RateOfTurn, 100)) 
 
             if not device.setOutputConfiguration(config_array):
                 raise RuntimeError("Could not configure the device. Aborting.")
@@ -157,13 +137,12 @@ class Receive:
             start_time = xda.XsTimeStamp_nowMs()
 
             # Main loop
-            self.setRunning(True)
             batch_pointer = 0 # keeps track of last processed position
             W = 5 # window size used by zero velocity detector
             speed = 5 # min increase in size before making estimates, has to be >= W
             threshold = 2.20E+08 # Threshold for the ZVD
             while not self.stop:
-                current_data_list = np.array(self.callback.data_list)
+                current_data_list = np.array(self.callback.getData())
                 length = len(current_data_list)
                 init = self.ins is None
                 if init:
@@ -198,7 +177,7 @@ class Receive:
                 name = '_'.join([trial_type,trial_speed,file_name])
             # Remaining unprocessed data
             if self.ins is not None and batch_pointer != 0:
-                current_data_list = np.array(self.callback.data_list)
+                current_data_list = np.array(self.callback.getData())
                 self.processData(current_data_list[batch_pointer-1:], W, threshold, False)
 
                 # Save final trajectory graphs
@@ -209,7 +188,7 @@ class Receive:
 
             # Save raw data        
             path = os.path.join('data',trial_type,trial_speed,file_name+'.csv')        
-            np.savetxt(path, self.callback.data_list, delimiter=",", header="AccX,AccY,AccZ,GyrX,GyrY,GyrZ", comments='')
+            np.savetxt(path, self.callback.getData(), delimiter=",", header="AccX,AccY,AccZ,GyrX,GyrY,GyrZ", comments='')
             print("Raw data CSV file created at: "+path)   
 
             # Save position and velocity estimates and if stationary
