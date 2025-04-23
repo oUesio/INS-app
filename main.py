@@ -6,12 +6,18 @@ from receive import Receive
 import warnings
 warnings.simplefilter("ignore", UserWarning)
 
-import time
-import matplotlib.pyplot as plt
+# Testing graph updates
+import time #
+import matplotlib.pyplot as plt #
 
 pg.setConfigOption('background', 'white')
 
 class CustomPlotWidget(pg.PlotWidget):
+    """
+    Custom PyQtGraph PlotWidget with black axes, grid, and legend.
+
+    :param title: Title for the plot
+    """
     def __init__(self, title, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -26,6 +32,13 @@ class CustomPlotWidget(pg.PlotWidget):
         self.addLegend(labelTextColor='k')
 
 class Worker(QRunnable):
+    """
+    A worker class to run background tasks in a separate thread.
+
+    :param fn: Function to execute
+    :param args: Arguments to pass into the function
+    :param kwargs: Keyword arguments to pass to the function
+    """
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
         self.fn = fn
@@ -34,12 +47,21 @@ class Worker(QRunnable):
 
     @pyqtSlot()
     def run(self):
+        """Runs the function with arguments in a background thread."""
         try:
             self.fn(*self.args, **self.kwargs)
         except Exception as e:
             print(f"Worker thread crashed: {e}")
 
 class MainWindow(QMainWindow):
+    """
+    Main application window for controlling data reception and displaying real-time IMU 
+    data visualisations.
+
+    :ivar rec: Instance of Receive for collecting and processing data
+    :ivar threadpool: Thread pool used to manage and execute background tasks concurrently
+    :ivar update_timer: Idle time for updating the visualisation plots
+    """
     def __init__(self):
         super().__init__()
         self.rec = Receive()
@@ -133,6 +155,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(full_window)
 
     def updateRawPlots(self, imudata):
+        """
+        Update linear acceleration and angular velocity plots with new IMU data.
+
+        :param imudata: Array of accelerometer and gyroscope data
+        """
         try:
             data = imudata[-250:]
             indices = np.arange(len(imudata))[-250:]
@@ -148,6 +175,12 @@ class MainWindow(QMainWindow):
             print(f"Unexpected error (updateRawPlots): {e}")
 
     def updatePositionPlot(self, estimates, zv):
+        """
+        Update trajectory plot and zero-velocity scatter markers.
+
+        :param estimates: Array of estimated states from the INS
+        :param zv: Zero velocity detection flags
+        """
         try:
             traj_true = estimates[zv]
             self.scatter_plot.setData(-traj_true[:, 0], traj_true[:, 1], pen=pg.mkPen(width=3, color='r'), symbol='o', name="Estimated ZV")
@@ -156,6 +189,9 @@ class MainWindow(QMainWindow):
             print(f"Unexpected error (updatePositionPlot): {e}")
 
     def updateData(self):
+        """
+        Called at regular intervals to update both raw sensor plots and position trajectory.
+        """
         try:
             if self.rec.getRunning():
                 data_list = self.rec.getRawData()
@@ -178,6 +214,10 @@ class MainWindow(QMainWindow):
             print(f"Unexpected error (updateData): {e}")
 
     def startReceive(self):
+        """
+        Starts receiving IMU data by running Receive's main method and also starts the 
+        data update timer to start visualising the data.
+        """
         try:
             if not self.rec.getRunning():
                 self.rec.setRunning(True)
@@ -191,6 +231,9 @@ class MainWindow(QMainWindow):
             print(f"Unexpected error (startReceive): {e}")
 
     def stopReceive(self):
+        """
+        Stops receiving data and stops the update timer.
+        """
         try:
             # Only runs if receive is running
             if self.rec.getRunning():
@@ -207,6 +250,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Unexpected error (stopReceive): {e}")
 
+# Runs the application
 app = QApplication([])
 window = MainWindow()
 window.show()

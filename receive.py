@@ -6,15 +6,25 @@ import os
 from ins_tools.INS_realtime import INS
 import tools
 
-# Callback class to handle live data from the device
 class XdaCallback(xda.XsCallback):
+    """
+    Custom callback handler for handling live IMU data from the Xsens device.
+
+    :ivar m_lock: Thread lock to ensure thread-safe access to the data list
+    :ivar data_list: Accumulated list of IMU data (acceleration and gyroscope)
+    """
     def __init__(self):
         xda.XsCallback.__init__(self)
         self.m_lock = Lock() # Thread lock
         self.data_list = [] 
 
     def onLiveDataAvailable(self, dev, packet):
-        # Handle live data packets as they become available
+        """
+        Callback function triggered when new data is available.
+
+        :param dev: Device pointer (not used)
+        :param packet: IMU data packet containing acceleration and gyroscope data
+        """
         self.m_lock.acquire()
         assert(packet != 0) # Ensure the packet is valid
         acc = packet.calibratedAcceleration()
@@ -26,12 +36,22 @@ class XdaCallback(xda.XsCallback):
         self.m_lock.release()
 
     def getLengthData(self):
+        """Returns the length of the collected data list."""
         return len(self.data_list)
 
     def getData(self):
+        """Returns the collected IMU data."""
         return self.data_list
 
 class Receive:
+    """
+    Manages data collection from the Xsens device and processes it using the INS algorithm.
+
+    :ivar callback: Instance of XdaCallback for handling live IMU data
+    :ivar ins: Instance of the INS model used for trajectory estimation
+    :ivar estimates: Array of estimated states from the INS
+    :ivar zv: Zero velocity detection flags
+    """
     def __init__(self):
         self.stop = False
         self.running = False
@@ -41,24 +61,40 @@ class Receive:
         self.zv = None
 
     def getStop(self):
+        """Returns the current stop state."""
         return self.stop
     
     def getRunning(self):
+        """Returns the current running state."""
         return self.running
 
     def setStop(self, state):
+        """Sets the stop state."""
         self.stop = state
 
     def setRunning(self, state):
+        """Sets the running state."""
         self.running = state
 
     def getRawData(self):
+        """Returns the raw IMU data collected."""
         return self.callback.getData()
     
     def getEstimates(self):
+        """
+        Returns the current INS estimates and zero velocity detections.
+        """
         return self.estimates, self.zv
     
     def processData(self, imubatch, W, threshold, init):
+        """
+        Processes a micro-batch of IMU data using zero-velocity detection and INS baseline estimation.
+
+        :param imubatch: Array of IMU micro-batch data
+        :param W: Window size used in the  zero-velocity detector
+        :param threshold: Threshold value for the zero-velocity detector
+        :param init: Boolean flag to indicate if it is the initial estimation step
+        """
         zv = self.ins.Localizer.compute_zv_lrt(imudata=imubatch, W=W, G=threshold)
         estimates = self.ins.baseline(imudata=imubatch, zv=zv, init=init)
 
@@ -66,6 +102,13 @@ class Receive:
         self.zv = zv if init else np.concatenate((self.zv, zv[1:]))
 
     def main(self, trial_type, trial_speed, file_name):
+        """
+        Main method to run the data collection, processing, and saving.
+
+        :param trial_type: Type of trial (hallway or stairs)
+        :param trial_speed: Movement speed (walk, run, or mixed)
+        :param file_name: Output file name
+        """
         self.callback = XdaCallback() # Resets callback
         self.ins = None # resets ins
         # Default values
@@ -136,11 +179,12 @@ class Receive:
                 raise RuntimeError("Failed to start recording. Aborting.")
             start_time = xda.XsTimeStamp_nowMs()
 
-            # Main loop
             batch_pointer = 0 # keeps track of last processed position
             W = 5 # window size used by zero velocity detector
             speed = 5 # min increase in size before making estimates, has to be >= W
             threshold = 2.20E+08 # Threshold for the ZVD
+
+            # Data collection loop
             while not self.stop:
                 current_data_list = np.array(self.callback.getData())
                 length = len(current_data_list)

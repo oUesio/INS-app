@@ -4,12 +4,13 @@ from ins_tools.geometry_helpers import quat2mat, mat2quat, euler2quat, quat2eule
 import sys
 sys.path.append('../')
 
-
-import matplotlib.pyplot as plt #################
-
 class Localizer():
+    """
+    Implements an INS localizer using Extended Kalman Filtering (EKF) techniques. 
+    Handles IMU data processing, navigation state updates, zero-velocity detection, and correction steps.
+    """
     def __init__(self, config, imubatch):
-        # config: A dictionary of configuration parameters
+        # A dictionary of configuration parameters from the INS class
         self.config = config
 
         # Initialise the first batch
@@ -36,11 +37,19 @@ class Localizer():
         self.P_hat[0,3:6,3:6] = np.power(1e-5,2)*np.identity(3) #velocity (x,y,z) variance
         self.P_hat[0,6:9,6:9] = np.power(0.1*np.pi/180,2)*np.identity(3)
     
-    def getXQP(self): # return references
+    def getXQP(self): 
+        """Returns the states, orientations, and covariance matrices"""
         return self.x, self.q, self.P_hat
     
     # Replaces the previous batch with new empty batch with the first value the last value the previous batch
     def nextBatch(self, imushape):
+        """
+        Initialises a new state batch using the last values of the current batch.
+
+        :param imushape: Number of samples in the next IMU batch
+
+        :return: New batch for states, orientations, and covariance matrices initialised with the last known state
+        """
         x = np.zeros((imushape,9))
         q = np.zeros((imushape,4))
         P_hat = np.zeros((imushape,9,9))     
@@ -51,7 +60,7 @@ class Localizer():
         return self.x, self.q, self.P_hat
         
     def nav_eq(self,xin,imu,qin,dt):
-        '''
+        """
         Computes the navigation state update based on IMU measurements using quaternion-based attitude 
         propagation and kinematic equations.
 
@@ -65,7 +74,7 @@ class Localizer():
             - **q_out** (*ndarray*) – Updated quaternion
             - **Rot_out** (*ndarray*) – Rotation matrix corresponding to the updated quaternion
         :rtype: tuple (ndarray, ndarray, ndarray)
-        '''
+        """
         # Initialise of initial state xin to store updated state 
         x_out = np.copy(xin) 
         # Constructs the skew-symmetric matrix representing angular velocity in quaternion space
@@ -96,8 +105,8 @@ class Localizer():
         return x_out, q_out, Rot_out    
     
     def state_update(self, imu, q, dt):
-        '''
-        Computes the state transition matrix (F) and process noise Jacobian matrix (G) for the EKF.
+        """
+        Computes the state transition matrix (F) and process noise matrix (G) for the EKF.
 
         :param imu: IMU batch data
         :param q: Orientation represented as a quaternion
@@ -110,7 +119,7 @@ class Localizer():
             - **G** (*ndarray*) – 9×6 process noise matrix maps IMU noise to state errors, models how
                     uncertainty from sensor noise affects the system state
         :rtype: tuple (ndarray, ndarray)
-        '''
+        """
         # State Transition Matrix
         F = np.identity(9)
         F[0:3,3:6] = dt*np.identity(3)
@@ -134,7 +143,7 @@ class Localizer():
     
     # Corrects the predicted state using zero-velocity updates (ZUPTs) and the Kalman filter correction step
     def corrector(self, x_check, P_check, Rot):
-        '''
+        """
         EKF correction step for the predicted states using zero-velocity updates.
 
         :param x_check: State vector
@@ -146,7 +155,7 @@ class Localizer():
             - **P_check** (*ndarray*) – Updated covariance matrix
             - **q** (*ndarray*) – Updated quaternion representing the corrected orientation
         :rtype: tuple (ndarray, ndarray, ndarray)
-        '''
+        """
         # Identity matrices 
         eye3 = np.identity(3) # Attitude correction
         eye9 = np.identity(9) # Covariance updates
@@ -175,7 +184,7 @@ class Localizer():
 
     # Stationary Hypothesis Optimal Estimator (SHOE)
     def SHOE(self, imudata, W=5):
-        '''
+        """
         Stationary Hypothesis Optimal Estimator (SHOE)
         Analyses IMU data to determine when the system is stationary by computing a test statistic
         based on accelerometer and gyroscope measurements.
@@ -184,7 +193,7 @@ class Localizer():
         :param W: Window size for batch processing
 
         :returns: Zero-velocity indicator array where lower values indicate stationary periods
-        '''
+        """
         # Vector storing test statistics for each window
         T = np.zeros(np.int(np.floor(imudata.shape[0]/W)+1))
         # Zero velocity indicator array
@@ -219,7 +228,7 @@ class Localizer():
         return zupt
         
     def compute_zv_lrt(self, imudata, W=5, G=3e8, return_zv=True):
-        # Compares likelihoods  against a threshold to determine whether zero velocity is detected
+        """Compares likelihoods against a threshold to determine whether zero velocity is detected"""
         zv = self.SHOE(imudata=imudata, W=W)
         if return_zv:
             zv=zv<G

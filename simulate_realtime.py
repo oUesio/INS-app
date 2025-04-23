@@ -4,6 +4,20 @@ from ins_tools.INS_realtime import INS
 import random
 
 def processData(ins, win, thresh, imubatch, init): 
+    """
+    Processes a micro batch of IMU data using zero-velocity detection and trajectory estimation.
+
+    :param ins: INS object used for calculating the state estimates
+    :param win: Window size used in the zero-velocity detector
+    :param thresh: Threshold value for the zero-velocity detector
+    :param imubatch: Array of IMU micro-batch data
+    :param init: Boolean flag to indicate if it is the initial estimation step
+
+    :returns:
+        - **x** (*ndarray*) – Estimated position and velocity states
+        - **zv** (*ndarray*) – Boolean array indicating zero-velocity points
+    :rtype: tuple (ndarray, ndarray)
+    """
     zv = ins.Localizer.compute_zv_lrt(imudata=imubatch, W=win, G=thresh)
     x = ins.baseline(imudata=imubatch, zv=zv, init=init)
     return x, zv
@@ -13,6 +27,7 @@ W = 5
 sig_a = 0.00098
 sig_w = 9.20E-05
 
+# Loads raw IMU data from CSV file
 imu = np.loadtxt('data/hallway/walk/trial1.csv', delimiter=",", skiprows=1)
 print (imu)
 ins = None 
@@ -28,7 +43,7 @@ while batch_pointer < len(imu):
         x, z = processData(ins, W, thresh, imu[:20], init)
         batch_pointer = 20
     else:
-        rand = random.randint(5, 20) # substitutes for (length of data collected at the time - batch_pointer)
+        rand = random.randint(5, 20) # substitutes for amount of unprocessed data at the time
         batch_size = ((rand // W) * W) - 1 # makes sure it is size 5n - 1
         x, z = processData(ins, W, thresh, imu[batch_pointer-1:batch_pointer+batch_size], init)
         batch_pointer += batch_size

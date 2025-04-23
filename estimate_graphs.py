@@ -2,9 +2,11 @@ import tools
 import os
 import numpy as np
 
+# Regenerates all the real-time trajectory graphs by using the state estimates collected during the testing trials.
 directory = 'results/estimates'
 for filename in sorted(os.listdir(directory)):
-    if ("walk_trial" in filename or "run_trial" in filename or "stairs_trial" in filename or "mixed_trial" in filename) and filename.endswith(".csv"):  # Filter relevant CSV files
+     # Filter to get the trial CSV files
+    if ("walk_trial" in filename or "run_trial" in filename or "stairs_trial" in filename or "mixed_trial" in filename) and filename.endswith(".csv"): 
         file_path = os.path.join(directory, filename)
         print (filename)
         data = np.loadtxt(file_path, delimiter=",", skiprows=1)

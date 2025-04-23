@@ -2,6 +2,15 @@ import numpy as np
 from ins_tools.EKF_realtime import Localizer
 
 class INS():
+    """
+    Inertial Navigation System class for estimating position, velocity, and orientation
+    from IMU data using zero-velocity updates and a ExtendedKalman filter-based approach.
+
+    :param imudata: Array of IMU micro-batch data
+    :param sigma_a: Standard deviation of accelerometer noise (default: 0.01)
+    :param sigma_w: Standard deviation of gyroscope noise in rad/s (default: 0.01 deg converted to rad)
+    :param T: Sampling period in seconds (default: 1/100)
+    """
     def __init__(self, imudata, sigma_a=0.01, sigma_w=0.01*np.pi/180, T=1.0/100):
         self.config = {
         "sigma_a": sigma_a,
@@ -12,19 +21,19 @@ class INS():
         # Noise standard deviations
         self.sigma_a = self.config["sigma_a"]
         self.sigma_w = self.config["sigma_w"]
+        # Variances from standard deviations
         self.var_a = np.power(self.sigma_a,2)
         self.config["var_a"] = self.var_a
         self.var_w = np.power(self.sigma_w,2)
         self.config["var_w"] = self.var_w
-
+        # Gravity and time step
         self.g = self.config["g"]
         self.T = self.config["T"]
-        # Variances of the accelerometer and gyroscope noise
         self.sigma_acc = 0.5*np.ones((1,3))
         self.var_acc = np.power(self.sigma_acc,2)
         self.sigma_gyro = 0.5*np.ones((1,3))*np.pi/180
         self.var_gyro = np.power(self.sigma_gyro,2)
-        # Combines the variances of accelerometer and gyroscope noises into a covariance matrix
+        # Process noise covariance matrix        
         self.Q = np.zeros((6,6)) 
         self.Q[0:3,0:3] = self.var_acc*np.identity(3)
         self.Q[3:6,3:6] = self.var_gyro*np.identity(3)
@@ -39,13 +48,13 @@ class INS():
         self.H[0:3,3:6] = np.identity(3)
         self.config["H"]= self.H      
 
-        # Initialises the state vector, quaternion, and state covariance using the Localizer
+        # Initialise the Localizer for state estimation
         self.Localizer = Localizer(self.config, imudata)
         self.x_check, self.q, self.P = self.Localizer.getXQP()
         
     # Performs the core navigation computation
     def baseline(self, imudata, zv, init, G=5e8):
-        '''
+        """
         Performs the core navigation computation
 
         :param imudata: IMU batch data
@@ -54,7 +63,7 @@ class INS():
         :param G: Process noise tuning parameter
 
         :returns: Estimated position
-        '''
+        """
         if init is False: # 3 attributes already made when INS initialised
             # Intialises state estimates for this batch
             self.x_check, self.q, self.P = self.Localizer.nextBatch(imudata.shape[0])

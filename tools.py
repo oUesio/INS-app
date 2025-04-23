@@ -2,7 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def save_topdown(traj, zv, name, speed, save_dir):
-    # Make the same size
+    """
+    Generates and saves a top-down 2D trajectory plot with zero-velocity points marked.
+
+    :param traj: Trajectory data array
+    :param zv: Zero velocity detection flags
+    :param name: Name of the trial
+    :param speed: Speed descriptor for the trial (walk, run, or mixed)
+    :param save_dir: Full path where the output image will be saved
+    """    
     min_len = min(len(traj), len(zv))
     traj = traj[:min_len]
     zv = zv[:min_len]
@@ -23,6 +31,16 @@ def save_topdown(traj, zv, name, speed, save_dir):
     plt.savefig(save_dir, dpi=400, bbox_inches='tight')
 
 def save_vertical(traj, zv, name, speed, save_dir, T=1.0/100):
+    """
+    Generates and saves a vertical trajectory plot with zero-velocity points marked.
+
+    :param traj: Trajectory data array
+    :param zv: Zero velocity detection flags
+    :param name: Name of the trial
+    :param speed: Speed descriptor for the trial (walk, run, or mixed)
+    :param save_dir: Full path where the output image will be saved
+    :param T: Sampling time interval in seconds
+    """    
     min_len = min(len(traj), len(zv))
     traj = traj[:min_len]
     zv = zv[:min_len]

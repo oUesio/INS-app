@@ -8,7 +8,7 @@ def calc_dist(x):
 
 estimates = 'results/estimates'
 
-
+# Distances travelled for the different conditions
 dists = {'walk':42.8, 'run':42.8, 'mixed':42.8, '1F':9.1, '2F':24.95, '3F':40.8}
 total = {'walk':[], 'run':[], 'mixed':[], '1F':[], '2F':[], '3F':[]}
 # Real-time estimates
@@ -46,12 +46,25 @@ for filename in sorted(os.listdir(estimates)):
 print (total)
 for x in total:
     mean = sum(total[x]) / 9
+    # Average loop closure error
     print (x + ' position error: ' + str(round(mean,4)) + 'm')
+    # Average relative error
     print (x + ' relative error: ' + str(round((mean/dists[x])*100, 4)) + '%')
+    # Standard deviation
     print (x + ' sd: ' + str(round(math.sqrt(sum((val - mean) ** 2 for val in total[x]) / (len(total[x]) - 1)),4)))
 
-# Full Data
 def full_estimates(trial_type, trial_speed, file_name):
+    """
+    Loads IMU data from a raw IMU data CSV file and initialises the INS to process the data all at once.
+
+    :param trial_type: Type of trial (hallway or stairs)
+    :param trial_speed: Movement speed (walk, run, or mixed)
+    :param file_name: IMU data file name
+
+    :returns: 
+        - **x** (*ndarray*) – Array of estimated states from the INS
+    :rtype: ndarray
+    """
     imu = np.loadtxt(os.path.join('data',trial_type,trial_speed,file_name), delimiter=",", skiprows=1)
     ins = INS(imu, sigma_a = 0.00098, sigma_w = 9.20E-05)
     zv = ins.Localizer.compute_zv_lrt(imu, W=5, G=2.20E+08)
@@ -65,7 +78,7 @@ for d in dirs:
     if d == 'stairs':
         full = 'data/'+d
         for filename in sorted(os.listdir(full)):
-            if filename.endswith(".csv"): 
+            if ('trial' in filename) and filename.endswith(".csv"): 
                 if "1F" in filename:
                     total_full['1F'].append(calc_dist(full_estimates('stairs', '', filename)[-1,:3]))
                 elif "2F" in filename:
@@ -75,7 +88,7 @@ for d in dirs:
     else:
         full = 'data/hallway/'+d
         for filename in sorted(os.listdir(full)):
-            if filename.endswith(".csv"): 
+            if ('trial' in filename) and filename.endswith(".csv"): 
                 total_full[d].append(calc_dist(full_estimates('hallway', d, filename)[-1,:2]))
 
 print (total_full)
