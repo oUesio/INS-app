@@ -8,6 +8,9 @@ class Localizer():
     """
     Implements an INS localizer using Extended Kalman Filtering (EKF) techniques. 
     Handles IMU data processing, navigation state updates, zero-velocity detection, and correction steps.
+
+    :param config: Dictionary of configuration parameters
+    :param imubatch: Initial batch of IMU data
     """
     def __init__(self, config, imubatch):
         # A dictionary of configuration parameters from the INS class
@@ -192,7 +195,7 @@ class Localizer():
         :param imudata: IMU batch data
         :param W: Window size for batch processing
 
-        :returns: Zero-velocity indicator array where lower values indicate stationary periods
+        :returns: Array containing zero-velocity detection statistics for each IMU sample
         """
         # Vector storing test statistics for each window
         T = np.zeros(np.int(np.floor(imudata.shape[0]/W)+1))

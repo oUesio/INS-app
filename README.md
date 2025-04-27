@@ -1,6 +1,6 @@
 # Real-time implementation of a foot-mounted Inertial Navigation System (INS)
 
-A real-time implementation of a foot-mounted Inertial Navigation System adapted from [PyShoe](https://github.com/utiasSTARS/pyshoe). This project uses a PyQt6-based application to collect and process IMU data into state estimates, which are displayed in real-time. Stance Phase Optimal Detection (SHOE) zero-velocity detector and Extended Kalman Filter (EKF) are used for accurate state estimation.
+A real-time implementation of a foot-mounted Inertial Navigation System adapted from [PyShoe](https://github.com/utiasSTARS/pyshoe). This project uses a PyQt6-based application to collect and process IMU data into state estimates, which are displayed in real-time. The data receiver is adapted from example receive code from the MT SDK located in the MT Software Suite 2022. Stance Phase Optimal Detection (SHOE) zero-velocity detector and Extended Kalman Filter (EKF) are used for accurate state estimation.
 
 ![Live Plot](results/GUI.png)
 
@@ -31,7 +31,7 @@ A real-time implementation of a foot-mounted Inertial Navigation System adapted 
 
 3. **Install Xsens Software** *(required only for running the application, not for the utility scripts)*
    - Download the MT Software Suite 2022 from [Movella Support](https://www.movella.com/support/software-documentation).
-   - Follow instructions in the download to install the `xsensdeviceapi` wheel matching your Python version.
+   - Follow the instructions in the download to install the `xsensdeviceapi` wheel matching your Python version.
 
 4. **Allow access to serial port** *(if necessary)*
    ```bash

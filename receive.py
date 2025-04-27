@@ -47,6 +47,8 @@ class Receive:
     """
     Manages data collection from the Xsens device and processes it using the INS algorithm.
 
+    :ivar stop: Boolean to control the data collection loop
+    :ivar running: Boolean stating if the main method is running
     :ivar callback: Instance of XdaCallback for handling live IMU data
     :ivar ins: Instance of the INS model used for trajectory estimation
     :ivar estimates: Array of estimated states from the INS
@@ -235,7 +237,7 @@ class Receive:
             np.savetxt(path, self.callback.getData(), delimiter=",", header="AccX,AccY,AccZ,GyrX,GyrY,GyrZ", comments='')
             print("Raw data CSV file created at: "+path)   
 
-            # Save position and velocity estimates and if stationary
+            # Save position and velocity estimates and stationary detections
             combined = np.column_stack((self.estimates[:,0:6], self.zv.astype(int)))
             np.savetxt(f"results/estimates/{name}.csv", combined, delimiter=",", header="x,y,z,vx,vy,vz,zv", comments='', fmt="%.15g,%.15g,%.15g,%.15g,%.15g,%.15g,%d")
             print("Estimates CSV file created at: "+f"results/estimates/{name}.csv") 
