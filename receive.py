@@ -111,6 +111,7 @@ class Receive:
         :param trial_speed: Movement speed (walk, run, or mixed)
         :param file_name: Output file name
         """
+        self.setRunning(True)
         self.callback = XdaCallback() # Resets callback
         self.ins = None # resets ins
         # Default values
@@ -120,10 +121,6 @@ class Receive:
             trial_speed = "walk"
         if not file_name:
             file_name = "exportfile"
-        if trial_type not in ['hallway', 'stairs']:
-            raise RuntimeError("Invalid trial type (hallway, stairs). Aborting.")
-        if trial_type == 'hallway' and trial_speed not in ['walk', 'run', 'mixed']:
-            raise RuntimeError("Invalid trial speed for hallway (walk, run, mixed). Aborting.")
 
         # Create XsControl object
         control = xda.XsControl_construct()

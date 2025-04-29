@@ -4,7 +4,7 @@ from ins_tools.EKF_realtime import Localizer
 class INS():
     """
     Inertial Navigation System class for estimating position, velocity, and orientation
-    from IMU data using zero-velocity updates and a ExtendedKalman filter-based approach.
+    from IMU data using zero-velocity updates and a Extended Kalman filter-based approach.
 
     :param imudata: Array of IMU micro-batch data
     :param sigma_a: Standard deviation of accelerometer noise (default: 0.01)

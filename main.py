@@ -172,7 +172,7 @@ class MainWindow(QMainWindow):
                 self.line5.setData(indices, data[:, 4] / 180 / np.pi)
                 self.line6.setData(indices, data[:, 5] / 180 / np.pi)
         except Exception as e:
-            print(f"Unexpected error (updateRawPlots): {e}")
+            print(f"Error (updateRawPlots): {e}")
 
     def updatePositionPlot(self, estimates, zv):
         """
@@ -186,7 +186,7 @@ class MainWindow(QMainWindow):
             self.scatter_plot.setData(-traj_true[:, 0], traj_true[:, 1], pen=pg.mkPen(width=3, color='r'), symbol='o', name="Estimated ZV")
             self.traj_plot.setData(-estimates[:, 0], estimates[:, 1])
         except Exception as e:
-            print(f"Unexpected error (updatePositionPlot): {e}")
+            print(f"Error (updatePositionPlot): {e}")
 
     def updateData(self):
         """
@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
                 if data_list: # Empty list
                     self.updateRawPlots(np.array(data_list))
         except Exception as e:
-            print(f"Unexpected error (updateData): {e}")
+            print(f"Error (updateData): {e}")
 
     def startReceive(self):
         """
@@ -220,15 +220,18 @@ class MainWindow(QMainWindow):
         """
         try:
             if not self.rec.getRunning():
-                self.rec.setRunning(True)
                 input1 = self.receive_input1.text()
                 input2 = self.receive_input2.text()
                 input3 = self.receive_input3.text()
+                if input1 not in ['','hallway', 'stairs']:
+                    raise RuntimeError("Invalid trial type (hallway, stairs). Aborting.")
+                if input1 in ['','hallway'] and input2 not in ['', 'walk', 'run', 'mixed']:
+                    raise RuntimeError("Invalid trial speed for hallway (walk, run, mixed). Aborting.")
                 rec_main = Worker(self.rec.main, input1, input2, input3)
                 self.threadpool.start(rec_main)
                 self.update_timer.start(20)
         except Exception as e:
-            print(f"Unexpected error (startReceive): {e}")
+            print(f"Error (startReceive): {e}")
 
     def stopReceive(self):
         """
@@ -248,7 +251,7 @@ class MainWindow(QMainWindow):
                 #plt.grid()
                 #plt.savefig('update_rate.png', dpi=400, bbox_inches='tight')   
         except Exception as e:
-            print(f"Unexpected error (stopReceive): {e}")
+            print(f"Error (stopReceive): {e}")
 
 # Runs the application
 app = QApplication([])
